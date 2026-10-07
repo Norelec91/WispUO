@@ -1,0 +1,73 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 09:04:41 +0200
+Subject: [PATCH] Name the distribution WispUO
+
+The launcher is WispUO.exe on Windows and the WispUO script elsewhere, its
+window is titled WispUO, the macOS bundle is WispUO.app (data in Application
+Support/WispUO) and the Flatpak is io.github.Norelec91.WispUO in
+bin/WispUO.flatpak. The client inside keeps its name, ClassicUO, and is
+described as such. A launcher left by an earlier build under the old name is
+removed. The icon is still ClassicUO's.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ scripts/build-naot.sh | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/scripts/build-naot.sh b/scripts/build-naot.sh
+index c3ab6fb85..816199687 100755
+--- a/scripts/build-naot.sh
++++ b/scripts/build-naot.sh
+@@ -111,20 +111,20 @@ echo "Building for $target"
+ # scratch every time, so nothing stale survives and architectures never mix.
+ bin_directory="$output_directory/bin"
+ 
+-# ClassicUO opens the launcher, which shows the shard list and then starts the
++# WispUO opens the launcher, which shows the shard list and then starts the
+ # client. Arguments skip the window and go straight to the client. Both run in the
+ # top folder, which is where the client looks for settings.json and Data.
+ write_launcher() {
+   case $platform in
+     MINGW* | CYGWIN* | MSYS*)
+       # No script on Windows, it would open a console: the launcher itself is
+-      # ClassicUO.exe and loads its libraries from bin (Program.UseBinFolder).
+-      mv -f "$bin_directory/ClassicUOLauncher.exe" "$output_directory/ClassicUO.exe"
++      # WispUO.exe and loads its libraries from bin (Program.UseBinFolder).
++      mv -f "$bin_directory/ClassicUOLauncher.exe" "$output_directory/WispUO.exe"
+       return
+       ;;
+   esac
+ 
+-  cat > "$output_directory/ClassicUO" <<LAUNCHER
++  cat > "$output_directory/WispUO" <<LAUNCHER
+ #!/bin/bash
+ cd "\$(cd -P -- "\$(dirname -- "\$0")" && pwd -P)"
+ exec ./bin/ClassicUOLauncher "\$@"
+@@ -133,13 +133,15 @@ LAUNCHER
+ 
+ # Builds before bin existed put everything at the top, next to the user's files.
+ # Remove that payload, and only that: settings, launcher.json, Data and Logs stay.
++# The launcher was ClassicUO(.exe) before the distribution was named WispUO.
+ strip_flat_layout() {
+   rm -rf "$output_directory"/cuo "$output_directory"/cuo.exe "$output_directory"/cuo.dSYM \
+          "$output_directory"/ClassicUOLauncher "$output_directory"/ClassicUOLauncher.exe \
+          "$output_directory"/ClassicUO.PluginHost.* "$output_directory"/FNA.dll.config \
+          "$output_directory"/D3D12 "$output_directory"/*.dll "$output_directory"/*.dylib \
+          "$output_directory"/*.so* "$output_directory"/*.pdb "$output_directory"/*.dbg \
+-         "$output_directory"/.build-target "${output_directory%/}.target"
++         "$output_directory"/.build-target "${output_directory%/}.target" \
++         "$output_directory"/ClassicUO
+ }
+ 
+ # Earlier builds carried another plugin host: a bootstrap, a Mono host with its class
+@@ -185,7 +187,7 @@ chmod_outputs() {
+   # Written as an if, not as "[[ -f ]] && chmod": an unmatched glob makes the
+   # test fail, and a false test as the last statement of a function returns
+   # non-zero, which under set -e kills the script right here.
+-  for f in "$output_directory"/ClassicUO "$bin_directory"/ClassicUOLauncher "$bin_directory"/cuo; do
++  for f in "$output_directory"/WispUO "$bin_directory"/ClassicUOLauncher "$bin_directory"/cuo; do
+     if [[ -f "$f" ]]; then
+       chmod +x "$f"
+     fi

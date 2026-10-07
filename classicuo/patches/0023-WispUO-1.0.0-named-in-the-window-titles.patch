@@ -1,0 +1,80 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 12:44:31 +0200
+Subject: [PATCH] WispUO 1.0.0, named in the window titles
+
+src/WispUO.cs holds the distribution's name and version, linked by the client
+and the launcher. The game window is titled "WispUO 1.0.0" (after the
+character's name once in game) instead of ClassicUO's, and so is the launcher:
+the player sees what they run. The title is built in GameController.Distro.cs;
+GameController.cs only calls it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ src/ClassicUO.Client/ClassicUO.Client.csproj |  5 +++++
+ src/ClassicUO.Client/GameController.cs       | 21 +++-----------------
+ 2 files changed, 8 insertions(+), 18 deletions(-)
+
+diff --git a/src/ClassicUO.Client/ClassicUO.Client.csproj b/src/ClassicUO.Client/ClassicUO.Client.csproj
+index 6456d9dee..31ccddfa1 100644
+--- a/src/ClassicUO.Client/ClassicUO.Client.csproj
++++ b/src/ClassicUO.Client/ClassicUO.Client.csproj
+@@ -33,6 +33,11 @@
+     <Folder Include="Properties\" />
+   </ItemGroup>
+ 
++  <!-- the distribution's name and version, shared with the launcher -->
++  <ItemGroup>
++    <Compile Include="..\WispUO.cs" Link="WispUO.cs" />
++  </ItemGroup>
++
+   <ItemGroup>
+     <ProjectReference Include="..\..\external\FNA\FNA.Core.csproj" />
+     <ProjectReference Include="..\ClassicUO.Assets\ClassicUO.Assets.csproj" />
+diff --git a/src/ClassicUO.Client/GameController.cs b/src/ClassicUO.Client/GameController.cs
+index 56ae72457..361c89258 100644
+--- a/src/ClassicUO.Client/GameController.cs
++++ b/src/ClassicUO.Client/GameController.cs
+@@ -25,7 +25,7 @@ using static SDL3.SDL;
+ 
+ namespace ClassicUO
+ {
+-    internal unsafe class GameController : Microsoft.Xna.Framework.Game
++    internal unsafe partial class GameController : Microsoft.Xna.Framework.Game
+     {
+         private SDL_EventFilter _filter;
+ 
+@@ -55,7 +55,7 @@ namespace ClassicUO
+ 
+             Window.ClientSizeChanged += WindowOnClientSizeChanged;
+             Window.AllowUserResizing = true;
+-            Window.Title = $"ClassicUO - {CUOEnviroment.Version}";
++            Window.Title = DistroWindowTitle(null);
+             IsMouseVisible = Settings.GlobalSettings.RunMouseInASeparateThread;
+ 
+             IsFixedTimeStep = false; // Settings.GlobalSettings.FixedTimeStep;
+@@ -169,22 +169,7 @@ namespace ClassicUO
+ 
+         public void SetWindowTitle(string title)
+         {
+-            if (string.IsNullOrEmpty(title))
+-            {
+-#if DEV_BUILD
+-                Window.Title = $"ClassicUO [dev] - {CUOEnviroment.Version}";
+-#else
+-                Window.Title = $"ClassicUO - {CUOEnviroment.Version}";
+-#endif
+-            }
+-            else
+-            {
+-#if DEV_BUILD
+-                Window.Title = $"{title} - ClassicUO [dev] - {CUOEnviroment.Version}";
+-#else
+-                Window.Title = $"{title} - ClassicUO - {CUOEnviroment.Version}";
+-#endif
+-            }
++            Window.Title = DistroWindowTitle(title);
+         }
+ 
+         [MethodImpl(MethodImplOptions.AggressiveInlining)]
