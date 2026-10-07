@@ -1,0 +1,54 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 09:02:19 +0200
+Subject: [PATCH] Top bar: Debug goes last
+
+UO Store and Global Chat are skipped by button rather than by position, so
+what follows them stays on clients older than 7.0.64.0.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs b/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs
+index 7fec09e18..0518ff579 100644
+--- a/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs
++++ b/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs
+@@ -63,9 +63,9 @@ namespace ClassicUO.Game.UI.Gumps
+                 new[] { 0, (int)Buttons.Chat },
+                 new[] { 0, (int)Buttons.Help },
+                 new[] { 1, (int)Buttons.WorldMap },
+-                new[] { 0, (int)Buttons.Debug },
+                 new[] { 1, (int)Buttons.UOStore },
+-                new[] { 1, (int)Buttons.GlobalChat }
++                new[] { 1, (int)Buttons.GlobalChat },
++                new[] { 0, (int)Buttons.Debug }
+             };
+ 
+             var cliloc = Client.Game.UO.FileManager.Clilocs;
+@@ -79,9 +79,9 @@ namespace ClassicUO.Game.UI.Gumps
+                 cliloc.GetString(3000131, ResGumps.Chat),
+                 cliloc.GetString(3000134, ResGumps.Help),
+                 StringHelper.CapitalizeAllWords(cliloc.GetString(1015233, ResGumps.WorldMap)),
+-                cliloc.GetString(1042237, ResGumps.Debug),
+                 cliloc.GetString(1158008, ResGumps.UOStore),
+-                cliloc.GetString(1158390, ResGumps.GlobalChat)
++                cliloc.GetString(1158390, ResGumps.GlobalChat),
++                cliloc.GetString(1042237, ResGumps.Debug)
+             };
+ 
+             bool hasUOStore = Client.Game.UO.Version >= ClientVersion.CV_706400;
+@@ -104,9 +104,9 @@ namespace ClassicUO.Game.UI.Gumps
+ 
+             for (int i = 0; i < textTable.Length; i++)
+             {
+-                if (!hasUOStore && i >= (int)Buttons.UOStore)
++                if (!hasUOStore && (textTable[i][1] == (int)Buttons.UOStore || textTable[i][1] == (int)Buttons.GlobalChat))
+                 {
+-                    break;
++                    continue;
+                 }
+ 
+                 ushort graphic = (ushort)(textTable[i][0] != 0 ? 0x098D : 0x098B);

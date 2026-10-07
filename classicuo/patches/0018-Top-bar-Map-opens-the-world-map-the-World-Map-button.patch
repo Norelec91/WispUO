@@ -1,0 +1,62 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 09:02:19 +0200
+Subject: [PATCH] Top bar: Map opens the world map, the World Map button goes
+
+The classic radar stays on the Overview macro.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
+
+diff --git a/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs b/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs
+index 0518ff579..68bafdbb2 100644
+--- a/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs
++++ b/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs
+@@ -62,7 +62,6 @@ namespace ClassicUO.Game.UI.Gumps
+                 new[] { 1, (int)Buttons.Journal },
+                 new[] { 0, (int)Buttons.Chat },
+                 new[] { 0, (int)Buttons.Help },
+-                new[] { 1, (int)Buttons.WorldMap },
+                 new[] { 1, (int)Buttons.UOStore },
+                 new[] { 1, (int)Buttons.GlobalChat },
+                 new[] { 0, (int)Buttons.Debug }
+@@ -78,7 +77,6 @@ namespace ClassicUO.Game.UI.Gumps
+                 cliloc.GetString(3000129, ResGumps.Journal),
+                 cliloc.GetString(3000131, ResGumps.Chat),
+                 cliloc.GetString(3000134, ResGumps.Help),
+-                StringHelper.CapitalizeAllWords(cliloc.GetString(1015233, ResGumps.WorldMap)),
+                 cliloc.GetString(1158008, ResGumps.UOStore),
+                 cliloc.GetString(1158390, ResGumps.GlobalChat),
+                 cliloc.GetString(1042237, ResGumps.Debug)
+@@ -205,7 +203,7 @@ namespace ClassicUO.Game.UI.Gumps
+             switch ((Buttons)buttonID)
+             {
+                 case Buttons.Map:
+-                    GameActions.OpenMiniMap(World);
++                    GameActions.OpenWorldMap(World);
+ 
+                     break;
+ 
+@@ -268,11 +266,6 @@ namespace ClassicUO.Game.UI.Gumps
+                         debugGump.SetInScreen();
+                     }
+ 
+-                    break;
+-
+-                case Buttons.WorldMap:
+-                    GameActions.OpenWorldMap(World);
+-
+                     break;
+             }
+         }
+@@ -285,7 +278,6 @@ namespace ClassicUO.Game.UI.Gumps
+             Journal,
+             Chat,
+             Help,
+-            WorldMap,
+             Debug,
+             UOStore,
+             GlobalChat

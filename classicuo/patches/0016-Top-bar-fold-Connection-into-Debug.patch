@@ -1,0 +1,98 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 09:02:19 +0200
+Subject: [PATCH] Top bar: fold Connection into Debug
+
+The Debug panel ends with the line the NetStats gump showed: the ping when
+compact, ping and traffic when expanded, coloured by the ping. It lives in
+DebugGump.Network.cs; DebugGump.cs only calls it. NetworkStatsGump stays in the
+tree, unused, so merges with upstream do not stop on it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ .../Game/UI/Gumps/DebugGump.cs                |  5 +++--
+ .../Game/UI/Gumps/TopBarGump.cs               | 19 -------------------
+ 2 files changed, 3 insertions(+), 21 deletions(-)
+
+diff --git a/src/ClassicUO.Client/Game/UI/Gumps/DebugGump.cs b/src/ClassicUO.Client/Game/UI/Gumps/DebugGump.cs
+index 905e5e86c..1cd3f0d8e 100644
+--- a/src/ClassicUO.Client/Game/UI/Gumps/DebugGump.cs
++++ b/src/ClassicUO.Client/Game/UI/Gumps/DebugGump.cs
+@@ -13,7 +13,7 @@ using System.Xml;
+ 
+ namespace ClassicUO.Game.UI.Gumps
+ {
+-    internal class DebugGump : Gump
++    internal partial class DebugGump : Gump
+     {
+         private const string DEBUG_STRING_0 = "- FPS: {0} (Min={1}, Max={2}), Zoom: {3:0.00}, Total Objs: {4}\n";
+         private const string DEBUG_STRING_1 = "- Mobiles: {0}   Items: {1}   Statics: {2}   Multi: {3}   Lands: {4}   Effects: {5}\n";
+@@ -153,7 +153,7 @@ namespace ClassicUO.Game.UI.Gumps
+ 
+                 sb.Dispose();
+ 
+-                Vector2 size = Fonts.Bold.MeasureString(_cacheText);
++                Vector2 size = AddNetLine();
+ 
+                 _alphaBlendControl.Width = Width = (int) (size.X + 20);
+                 _alphaBlendControl.Height = Height = (int) (size.Y + 20);
+@@ -184,6 +184,7 @@ namespace ClassicUO.Game.UI.Gumps
+                         hueVector,
+                         layerDepth
+                     );
++                    DrawNetLine(batcher, x, y, layerDepth);
+                     return true;
+                 }
+             );
+diff --git a/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs b/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs
+index 39ed465b0..7fec09e18 100644
+--- a/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs
++++ b/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs
+@@ -64,7 +64,6 @@ namespace ClassicUO.Game.UI.Gumps
+                 new[] { 0, (int)Buttons.Help },
+                 new[] { 1, (int)Buttons.WorldMap },
+                 new[] { 0, (int)Buttons.Debug },
+-                new[] { 1, (int)Buttons.NetStats },
+                 new[] { 1, (int)Buttons.UOStore },
+                 new[] { 1, (int)Buttons.GlobalChat }
+             };
+@@ -81,7 +80,6 @@ namespace ClassicUO.Game.UI.Gumps
+                 cliloc.GetString(3000134, ResGumps.Help),
+                 StringHelper.CapitalizeAllWords(cliloc.GetString(1015233, ResGumps.WorldMap)),
+                 cliloc.GetString(1042237, ResGumps.Debug),
+-                cliloc.GetString(3000169, ResGumps.NetStats),
+                 cliloc.GetString(1158008, ResGumps.UOStore),
+                 cliloc.GetString(1158390, ResGumps.GlobalChat)
+             };
+@@ -272,22 +270,6 @@ namespace ClassicUO.Game.UI.Gumps
+ 
+                     break;
+ 
+-                case Buttons.NetStats:
+-                    NetworkStatsGump netstatsgump = UIManager.GetGump<NetworkStatsGump>();
+-
+-                    if (netstatsgump == null)
+-                    {
+-                        netstatsgump = new NetworkStatsGump(World, 100, 100);
+-                        UIManager.Add(netstatsgump);
+-                    }
+-                    else
+-                    {
+-                        netstatsgump.IsVisible = !netstatsgump.IsVisible;
+-                        netstatsgump.SetInScreen();
+-                    }
+-
+-                    break;
+-
+                 case Buttons.WorldMap:
+                     GameActions.OpenWorldMap(World);
+ 
+@@ -305,7 +287,6 @@ namespace ClassicUO.Game.UI.Gumps
+             Help,
+             WorldMap,
+             Debug,
+-            NetStats,
+             UOStore,
+             GlobalChat
+         }

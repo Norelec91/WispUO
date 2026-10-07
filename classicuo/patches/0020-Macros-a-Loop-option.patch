@@ -1,0 +1,205 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 09:04:25 +0200
+Subject: [PATCH] Macros: a Loop option
+
+A macro flagged as looping restarts from its first action when it ends, until
+its hotkey is pressed again or ESC stops it. Rewinding happens once per frame
+with a 250ms floor, so a macro without a Delay cannot lock the client up or
+flood the server, and keyboard auto-repeat does not toggle it. The macro button
+turns green while the loop runs, and the flag is saved in macros.xml.
+
+The code lives in MacroManager.Loop.cs and MacroControl.Distro.cs, the
+"Loop (ESC to stop)" text in Resources/ResDistro.resx; upstream's files only
+carry the calls into them.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ .../Game/Managers/MacroManager.cs                | 14 ++++++++++++--
+ .../Game/Scenes/GameSceneInputHandler.cs         | 16 ++++++++++++----
+ .../Game/UI/Controls/MacroControl.cs             |  6 +++++-
+ .../Game/UI/Gumps/MacroButtonGump.cs             |  4 ++--
+ .../Game/UI/Gumps/OptionsGump.cs                 |  1 +
+ 5 files changed, 32 insertions(+), 9 deletions(-)
+
+diff --git a/src/ClassicUO.Client/Game/Managers/MacroManager.cs b/src/ClassicUO.Client/Game/Managers/MacroManager.cs
+index bd14da55c..c048d3c74 100644
+--- a/src/ClassicUO.Client/Game/Managers/MacroManager.cs
++++ b/src/ClassicUO.Client/Game/Managers/MacroManager.cs
+@@ -20,7 +20,7 @@ using SDL3;
+ 
+ namespace ClassicUO.Game.Managers
+ {
+-    internal sealed class MacroManager : LinkedObject
++    internal sealed partial class MacroManager : LinkedObject
+     {
+         public static readonly string[] MacroNames = Enum.GetNames(typeof(MacroType));
+         private readonly uint[] _itemsInHand = new uint[2];
+@@ -57,6 +57,8 @@ namespace ClassicUO.Game.Managers
+ 
+         public void Load()
+         {
++            StopLoop();
++
+             string path = Path.Combine(ProfileManager.ProfilePath, "macros.xml");
+ 
+             if (!File.Exists(path))
+@@ -375,6 +377,11 @@ namespace ClassicUO.Game.Managers
+ 
+                         break;
+                 }
++
++                if (RewindLoop())
++                {
++                    return;
++                }
+             }
+         }
+ 
+@@ -1843,7 +1850,7 @@ namespace ClassicUO.Game.Managers
+     }
+ 
+ 
+-    internal class Macro : LinkedObject, IEquatable<Macro>
++    internal partial class Macro : LinkedObject, IEquatable<Macro>
+     {
+         public Macro(string name, SDL.SDL_Keycode key, bool alt, bool ctrl, bool shift) : this(name)
+         {
+@@ -1930,6 +1937,7 @@ namespace ClassicUO.Game.Managers
+             writer.WriteAttributeString("alt", Alt.ToString());
+             writer.WriteAttributeString("ctrl", Ctrl.ToString());
+             writer.WriteAttributeString("shift", Shift.ToString());
++            WriteLoop(writer);
+ 
+             writer.WriteStartElement("actions");
+ 
+@@ -1980,6 +1988,8 @@ namespace ClassicUO.Game.Managers
+                 WheelUp = bool.Parse(xml.GetAttribute("wheelup"));
+             }
+ 
++            ReadLoop(xml);
++
+             XmlElement actions = xml["actions"];
+ 
+             if (actions != null)
+diff --git a/src/ClassicUO.Client/Game/Scenes/GameSceneInputHandler.cs b/src/ClassicUO.Client/Game/Scenes/GameSceneInputHandler.cs
+index 20953e874..33ee2cda9 100644
+--- a/src/ClassicUO.Client/Game/Scenes/GameSceneInputHandler.cs
++++ b/src/ClassicUO.Client/Game/Scenes/GameSceneInputHandler.cs
+@@ -935,7 +935,7 @@ namespace ClassicUO.Game.Scenes
+                             return true;
+                         }
+ 
+-                        ExecuteMacro(mac);
++                        ExecuteMacro(macro);
+ 
+                         return true;
+                     }
+@@ -996,7 +996,7 @@ namespace ClassicUO.Game.Scenes
+                 {
+                     if (macro.Items is MacroObject mac)
+                     {
+-                        ExecuteMacro(mac);
++                        ExecuteMacro(macro);
+ 
+                         return true;
+                     }
+@@ -1147,6 +1147,8 @@ namespace ClassicUO.Game.Scenes
+             {
+                 case SDL.SDL_Keycode.SDLK_ESCAPE:
+ 
++                    _world.Macros.StopLoop();
++
+                     if (_world.Player.Pathfinder.AutoWalking && _world.Player.Pathfinder.PathindingCanBeCancelled)
+                     {
+                         _world.Player.Pathfinder.StopAutoWalk();
+@@ -1327,7 +1329,13 @@ namespace ClassicUO.Game.Scenes
+                         }
+                         else
+                         {
+-                            ExecuteMacro(mac);
++                            // the key auto-repeat must not toggle a looping macro on and off
++                            if (e.repeat && macro.Loop)
++                            {
++                                return;
++                            }
++
++                            ExecuteMacro(macro);
+                         }
+                     }
+                 }
+@@ -1519,7 +1527,7 @@ namespace ClassicUO.Game.Scenes
+                 && UIManager.SystemChat.Mode >= ChatMode.Default;
+         }
+ 
+-        private void ExecuteMacro(MacroObject macro)
++        private void ExecuteMacro(Macro macro)
+         {
+             _world.Macros.SetMacroToExecute(macro);
+             _world.Macros.WaitingBandageTarget = false;
+diff --git a/src/ClassicUO.Client/Game/UI/Controls/MacroControl.cs b/src/ClassicUO.Client/Game/UI/Controls/MacroControl.cs
+index ef4c2df62..489a2408c 100644
+--- a/src/ClassicUO.Client/Game/UI/Controls/MacroControl.cs
++++ b/src/ClassicUO.Client/Game/UI/Controls/MacroControl.cs
+@@ -13,7 +13,7 @@ using ClassicUO.Renderer.Gumps;
+ 
+ namespace ClassicUO.Game.UI.Controls
+ {
+-    internal class MacroControl : Control
++    internal partial class MacroControl : Control
+     {
+         private static readonly string[] _allHotkeysNames = Enum.GetNames(typeof(MacroType));
+         private static readonly string[] _allSubHotkeysNames = Enum.GetNames(typeof(MacroSubType));
+@@ -102,6 +102,8 @@ namespace ClassicUO.Game.UI.Controls
+                 );
+             }
+ 
++            AddLoopBox();
++
+             var scrollAreaH = isFastAssign ? 80 : 280;
+             var scrollAreaW = isFastAssign ? 230 : 280;
+ 
+@@ -125,6 +127,8 @@ namespace ClassicUO.Game.UI.Controls
+ 
+             Macro = _gump.World.Macros.FindMacro(name) ?? Macro.CreateEmptyMacro(name);
+ 
++            _loopBox.IsChecked = Macro.Loop;
++
+             SetupKeyByDefault();
+             SetupMacroUI();
+         }
+diff --git a/src/ClassicUO.Client/Game/UI/Gumps/MacroButtonGump.cs b/src/ClassicUO.Client/Game/UI/Gumps/MacroButtonGump.cs
+index 857c2cdbf..7def88143 100644
+--- a/src/ClassicUO.Client/Game/UI/Gumps/MacroButtonGump.cs
++++ b/src/ClassicUO.Client/Game/UI/Gumps/MacroButtonGump.cs
+@@ -112,7 +112,7 @@ namespace ClassicUO.Game.UI.Gumps
+         {
+             if (_macro != null)
+             {
+-                World.Macros.SetMacroToExecute(_macro.Items as MacroObject);
++                World.Macros.SetMacroToExecute(_macro);
+                 World.Macros.WaitForTargetTimer = 0;
+                 World.Macros.Update();
+             }
+@@ -141,7 +141,7 @@ namespace ClassicUO.Game.UI.Gumps
+ 
+                     batcher.DrawRectangle
+                     (
+-                        SolidColorTextureCache.GetTexture(Color.Gray),
++                        SolidColorTextureCache.GetTexture(World.Macros.IsLooping(_macro) ? Color.LimeGreen : Color.Gray),
+                         x,
+                         y,
+                         Width,
+diff --git a/src/ClassicUO.Client/Game/UI/Gumps/OptionsGump.cs b/src/ClassicUO.Client/Game/UI/Gumps/OptionsGump.cs
+index bb40bc8cb..bf0fcf1e6 100644
+--- a/src/ClassicUO.Client/Game/UI/Gumps/OptionsGump.cs
++++ b/src/ClassicUO.Client/Game/UI/Gumps/OptionsGump.cs
+@@ -2161,6 +2161,7 @@ namespace ClassicUO.Game.UI.Gumps
+                             {
+                                 UIManager.Gumps.OfType<MacroButtonGump>().FirstOrDefault(s => s._macro == _macroControl.Macro)?.Dispose();
+ 
++                                World.Macros.StopLoop(_macroControl.Macro);
+                                 World.Macros.Remove(_macroControl.Macro);
+ 
+                                 _macroControl.Dispose();

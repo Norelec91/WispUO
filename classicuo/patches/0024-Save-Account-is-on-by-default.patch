@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 16:58:52 +0200
+Subject: [PATCH] Save Account is on by default
+
+The login screen remembers the account unless the player says otherwise.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ src/ClassicUO.Client/Configuration/Settings.cs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/ClassicUO.Client/Configuration/Settings.cs b/src/ClassicUO.Client/Configuration/Settings.cs
+index 32343aaa3..bdff3a70c 100644
+--- a/src/ClassicUO.Client/Configuration/Settings.cs
++++ b/src/ClassicUO.Client/Configuration/Settings.cs
+@@ -63,7 +63,7 @@ namespace ClassicUO.Configuration
+ 
+         [JsonPropertyName("is_win_maximized")] public bool IsWindowMaximized { get; set; } = true;
+ 
+-        [JsonPropertyName("saveaccount")] public bool SaveAccount { get; set; }
++        [JsonPropertyName("saveaccount")] public bool SaveAccount { get; set; } = true;
+ 
+         [JsonPropertyName("autologin")] public bool AutoLogin { get; set; }
+ 

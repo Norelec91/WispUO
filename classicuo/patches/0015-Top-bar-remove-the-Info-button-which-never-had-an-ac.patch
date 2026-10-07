@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 09:02:19 +0200
+Subject: [PATCH] Top bar: remove the Info button, which never had an action
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs b/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs
+index 55d32f053..39ed465b0 100644
+--- a/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs
++++ b/src/ClassicUO.Client/Game/UI/Gumps/TopBarGump.cs
+@@ -63,7 +63,6 @@ namespace ClassicUO.Game.UI.Gumps
+                 new[] { 0, (int)Buttons.Chat },
+                 new[] { 0, (int)Buttons.Help },
+                 new[] { 1, (int)Buttons.WorldMap },
+-                new[] { 0, (int)Buttons.Info },
+                 new[] { 0, (int)Buttons.Debug },
+                 new[] { 1, (int)Buttons.NetStats },
+                 new[] { 1, (int)Buttons.UOStore },
+@@ -81,7 +80,6 @@ namespace ClassicUO.Game.UI.Gumps
+                 cliloc.GetString(3000131, ResGumps.Chat),
+                 cliloc.GetString(3000134, ResGumps.Help),
+                 StringHelper.CapitalizeAllWords(cliloc.GetString(1015233, ResGumps.WorldMap)),
+-                cliloc.GetString(1079449, ResGumps.Info),
+                 cliloc.GetString(1042237, ResGumps.Debug),
+                 cliloc.GetString(3000169, ResGumps.NetStats),
+                 cliloc.GetString(1158008, ResGumps.UOStore),
+@@ -306,7 +304,6 @@ namespace ClassicUO.Game.UI.Gumps
+             Chat,
+             Help,
+             WorldMap,
+-            Info,
+             Debug,
+             NetStats,
+             UOStore,
