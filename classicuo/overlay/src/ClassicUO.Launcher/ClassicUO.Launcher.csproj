@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- WinExe: no console window on Windows, the same as Exe everywhere else -->
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>ClassicUOLauncher</AssemblyName>
+    <RootNamespace>ClassicUO.Launcher</RootNamespace>
+    <ApplicationIcon>..\ClassicUO.Client\cuoicon.ico</ApplicationIcon>
+
+    <PublishAot>true</PublishAot>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- the distribution's name and version, shared with the client -->
+    <Compile Include="..\WispUO.cs" Link="WispUO.cs" />
+    <AvaloniaResource Include="..\ClassicUO.Client\cuoicon.ico" Link="Assets\cuoicon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ClassicUO.Launcher.Tests" />
+  </ItemGroup>
+
+</Project>

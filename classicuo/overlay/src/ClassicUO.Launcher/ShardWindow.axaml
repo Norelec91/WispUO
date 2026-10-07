@@ -1,0 +1,54 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ClassicUO.Launcher.ShardWindow"
+        Title="Shard"
+        Icon="/Assets/cuoicon.ico"
+        Width="440"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+
+  <StackPanel Margin="20" Spacing="6">
+    <TextBlock Text="Name" />
+    <TextBox x:Name="NameBox" PlaceholderText="My shard" />
+
+    <Grid ColumnDefinitions="*,12,100" RowDefinitions="Auto,Auto" Margin="0,6,0,0">
+      <TextBlock Text="Host" Margin="0,0,0,6" />
+      <TextBox Grid.Row="1" x:Name="HostBox" PlaceholderText="login.example.com" />
+      <TextBlock Grid.Column="2" Text="Port" Margin="0,0,0,6" />
+      <TextBox Grid.Column="2" Grid.Row="1" x:Name="PortBox" />
+    </Grid>
+
+    <TextBlock Text="Game folder" Margin="0,6,0,0" />
+    <Grid ColumnDefinitions="*,Auto">
+      <TextBox x:Name="UOFolderBox" PlaceholderText="The Ultima Online folder" />
+      <Button Grid.Column="1" Content="Browse…" Margin="8,0,0,0" Click="OnBrowse" />
+    </Grid>
+
+    <Expander x:Name="AdvancedExpander" Header="Advanced" Margin="0,10,0,0" HorizontalAlignment="Stretch">
+      <StackPanel Spacing="4">
+        <CheckBox x:Name="ClassicAssistBox" Content="Load ClassicAssist on this shard" />
+        <TextBlock x:Name="ClassicAssistHint" FontSize="12" Opacity="0.7" TextWrapping="Wrap"
+                   Text="ClassicAssist opens in its own window next to the game: macros, agents, hotkeys. Check the shard allows assistants." />
+
+        <TextBlock Text="Client version" Margin="0,8,0,0" />
+        <TextBox x:Name="ClientVersionBox" PlaceholderText="Automatic" />
+        <TextBlock Text="Leave empty unless the shard asks for a specific version."
+                   FontSize="12" Opacity="0.7" TextWrapping="Wrap" />
+
+        <CheckBox x:Name="EncryptionBox" Content="Encrypted client" Margin="0,8,0,0" />
+        <TextBlock FontSize="12" Opacity="0.7" TextWrapping="Wrap"
+                   Text="Only for the few shards that ask for it: most accept the client unencrypted." />
+      </StackPanel>
+    </Expander>
+
+    <TextBlock x:Name="ErrorText" TextWrapping="Wrap" Margin="0,6,0,0"
+               Foreground="{DynamicResource SystemFillColorCriticalBrush}" />
+
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
+      <Button Content="Cancel" Click="OnCancel" IsCancel="True" MinWidth="90" HorizontalContentAlignment="Center" />
+      <Button Content="Save" Click="OnSave" IsDefault="True" Classes="accent" MinWidth="90" HorizontalContentAlignment="Center" />
+    </StackPanel>
+  </StackPanel>
+</Window>
