@@ -1,0 +1,480 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 09:01:46 +0200
+Subject: [PATCH] Build the client, launcher and plugin host with NativeAOT
+ scripts
+
+- scripts/build.sh (dispatcher) and build-naot.sh build bin/dist on Windows
+  (Git Bash), Linux and macOS: the client as a single NativeAOT executable, the
+  launcher and the plugin host. ./ClassicUO starts the launcher. Files left by
+  the old bootstrap and Mono hosts are removed from bin/dist; FNA.dll.config
+  stays, Linux and macOS need it to find SDL3.
+- scripts/make-macos-app.sh turns bin/dist into bin/ClassicUO.app, keeping
+  settings.json and launcher.json as user data.
+- scripts/README.md documents the build, the launcher and how plugins run.
+- The client is a WinExe on Windows, so no console opens next to the game.
+- The deploy workflow builds with the scripts, for osx-arm64 and linux-arm64
+  as well; the solution lists the launcher, the plugin host and the scripts.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ .github/workflows/deploy.yml                 |  16 +-
+ ClassicUO.sln                                |  77 +++++++-
+ scripts/build-naot.sh                        | 181 +++++++++++++++++--
+ src/ClassicUO.Client/ClassicUO.Client.csproj |   3 +
+ 4 files changed, 263 insertions(+), 14 deletions(-)
+
+diff --git a/.github/workflows/deploy.yml b/.github/workflows/deploy.yml
+index ecfbe4487..7b5ba3368 100644
+--- a/.github/workflows/deploy.yml
++++ b/.github/workflows/deploy.yml
+@@ -36,10 +36,19 @@ jobs:
+         include:
+           - os: windows-latest
+             target: win-x64
++            arch: x64
+           - os: ubuntu-22.04
+             target: linux-x64
++            arch: x64
+           - os: macos-14
+             target: osx-x64
++            arch: x86_64
++          - os: macos-14
++            target: osx-arm64
++            arch: arm64
++          - os: ubuntu-22.04-arm
++            target: linux-arm64
++            arch: arm64
+ 
+     steps:
+       - uses: actions/checkout@v4
+@@ -57,7 +66,12 @@ jobs:
+           include-prerelease: false
+ 
+       - name: Build ClassicUO
+-        run: dotnet publish "${{ env.CUO_PROJECT_PATH }}" -c Release -r "${{ matrix.target }}" -o "${{ env.CUO_OUTPUT_PATH }}" /p:IS_DEV_BUILD=true /p:AssemblyVersion=${{ env.CUO_ASSEMBLY_VERSION }} /p:FileVersion=${{ env.CUO_ASSEMBLY_VERSION }} /p:NativeLib=Shared /p:OutputType=Library
++        run: >
++          bash scripts/build.sh
++          --arch ${{ matrix.arch }}
++          --out "${{ env.CUO_OUTPUT_PATH }}"
++          --version ${{ env.CUO_ASSEMBLY_VERSION }}
++          --dev-build
+ 
+       - name: upload-unsigned-artifact
+         if: matrix.os == 'windows-latest'
+diff --git a/ClassicUO.sln b/ClassicUO.sln
+index 68f87163f..6fd8e9e86 100644
+--- a/ClassicUO.sln
++++ b/ClassicUO.sln
+@@ -7,8 +7,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{8EAF9583-DC5
+ EndProject
+ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "scripts", "scripts", "{FD7202D2-B96B-4425-8C61-F0D5254A06F7}"
+ 	ProjectSection(SolutionItems) = preProject
+-		scripts\build.cmd = scripts\build.cmd
++		scripts\README.md = scripts\README.md
+ 		scripts\build.sh = scripts\build.sh
++		scripts\build-naot.sh = scripts\build-naot.sh
++		scripts\fetch-natives.sh = scripts\fetch-natives.sh
++		scripts\make-macos-app.sh = scripts\make-macos-app.sh
+ 	EndProjectSection
+ EndProject
+ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{D5E764E7-2719-4937-AC10-0D2D789A1134}"
+@@ -45,94 +48,164 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FNA.Core", "external\FNA\FN
+ EndProject
+ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FileEmbed", "external\FileEmbed\FileEmbed\FileEmbed.csproj", "{027B5178-C306-4900-996D-97E8E43567B6}"
+ EndProject
++Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClassicUO.Launcher", "src\ClassicUO.Launcher\ClassicUO.Launcher.csproj", "{E8449699-9E15-4D0D-9385-E9B5A037D1D6}"
++EndProject
++Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClassicUO.PluginHost", "src\ClassicUO.PluginHost\ClassicUO.PluginHost.csproj", "{DAF00C89-07F4-4DD3-B48E-F089006FEC72}"
++EndProject
+ Global
+ 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+ 		Debug|Any CPU = Debug|Any CPU
+ 		Debug|x64 = Debug|x64
++		Debug|x86 = Debug|x86
+ 		Release|Any CPU = Release|Any CPU
+ 		Release|x64 = Release|x64
++		Release|x86 = Release|x86
+ 	EndGlobalSection
+ 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+ 		{6F193271-70B3-48EC-9CE5-B8EE1A5CA89E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+ 		{6F193271-70B3-48EC-9CE5-B8EE1A5CA89E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+ 		{6F193271-70B3-48EC-9CE5-B8EE1A5CA89E}.Debug|x64.ActiveCfg = Debug|Any CPU
+ 		{6F193271-70B3-48EC-9CE5-B8EE1A5CA89E}.Debug|x64.Build.0 = Debug|Any CPU
++		{6F193271-70B3-48EC-9CE5-B8EE1A5CA89E}.Debug|x86.ActiveCfg = Debug|Any CPU
++		{6F193271-70B3-48EC-9CE5-B8EE1A5CA89E}.Debug|x86.Build.0 = Debug|Any CPU
+ 		{6F193271-70B3-48EC-9CE5-B8EE1A5CA89E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+ 		{6F193271-70B3-48EC-9CE5-B8EE1A5CA89E}.Release|Any CPU.Build.0 = Release|Any CPU
+ 		{6F193271-70B3-48EC-9CE5-B8EE1A5CA89E}.Release|x64.ActiveCfg = Release|Any CPU
+ 		{6F193271-70B3-48EC-9CE5-B8EE1A5CA89E}.Release|x64.Build.0 = Release|Any CPU
++		{6F193271-70B3-48EC-9CE5-B8EE1A5CA89E}.Release|x86.ActiveCfg = Release|Any CPU
++		{6F193271-70B3-48EC-9CE5-B8EE1A5CA89E}.Release|x86.Build.0 = Release|Any CPU
+ 		{85972CEA-4AB1-45DC-922C-00C4E17764B5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+ 		{85972CEA-4AB1-45DC-922C-00C4E17764B5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+ 		{85972CEA-4AB1-45DC-922C-00C4E17764B5}.Debug|x64.ActiveCfg = Debug|Any CPU
+ 		{85972CEA-4AB1-45DC-922C-00C4E17764B5}.Debug|x64.Build.0 = Debug|Any CPU
++		{85972CEA-4AB1-45DC-922C-00C4E17764B5}.Debug|x86.ActiveCfg = Debug|Any CPU
++		{85972CEA-4AB1-45DC-922C-00C4E17764B5}.Debug|x86.Build.0 = Debug|Any CPU
+ 		{85972CEA-4AB1-45DC-922C-00C4E17764B5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+ 		{85972CEA-4AB1-45DC-922C-00C4E17764B5}.Release|Any CPU.Build.0 = Release|Any CPU
+ 		{85972CEA-4AB1-45DC-922C-00C4E17764B5}.Release|x64.ActiveCfg = Release|Any CPU
+ 		{85972CEA-4AB1-45DC-922C-00C4E17764B5}.Release|x64.Build.0 = Release|Any CPU
++		{85972CEA-4AB1-45DC-922C-00C4E17764B5}.Release|x86.ActiveCfg = Release|Any CPU
++		{85972CEA-4AB1-45DC-922C-00C4E17764B5}.Release|x86.Build.0 = Release|Any CPU
+ 		{5AF00B6D-70C2-4CB0-A5D8-41F488F0DDF2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+ 		{5AF00B6D-70C2-4CB0-A5D8-41F488F0DDF2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+ 		{5AF00B6D-70C2-4CB0-A5D8-41F488F0DDF2}.Debug|x64.ActiveCfg = Debug|Any CPU
+ 		{5AF00B6D-70C2-4CB0-A5D8-41F488F0DDF2}.Debug|x64.Build.0 = Debug|Any CPU
++		{5AF00B6D-70C2-4CB0-A5D8-41F488F0DDF2}.Debug|x86.ActiveCfg = Debug|Any CPU
++		{5AF00B6D-70C2-4CB0-A5D8-41F488F0DDF2}.Debug|x86.Build.0 = Debug|Any CPU
+ 		{5AF00B6D-70C2-4CB0-A5D8-41F488F0DDF2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+ 		{5AF00B6D-70C2-4CB0-A5D8-41F488F0DDF2}.Release|Any CPU.Build.0 = Release|Any CPU
+ 		{5AF00B6D-70C2-4CB0-A5D8-41F488F0DDF2}.Release|x64.ActiveCfg = Release|Any CPU
+ 		{5AF00B6D-70C2-4CB0-A5D8-41F488F0DDF2}.Release|x64.Build.0 = Release|Any CPU
++		{5AF00B6D-70C2-4CB0-A5D8-41F488F0DDF2}.Release|x86.ActiveCfg = Release|Any CPU
++		{5AF00B6D-70C2-4CB0-A5D8-41F488F0DDF2}.Release|x86.Build.0 = Release|Any CPU
+ 		{4B2C7249-9728-451B-8C9C-F73A164703B6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+ 		{4B2C7249-9728-451B-8C9C-F73A164703B6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+ 		{4B2C7249-9728-451B-8C9C-F73A164703B6}.Debug|x64.ActiveCfg = Debug|Any CPU
+ 		{4B2C7249-9728-451B-8C9C-F73A164703B6}.Debug|x64.Build.0 = Debug|Any CPU
++		{4B2C7249-9728-451B-8C9C-F73A164703B6}.Debug|x86.ActiveCfg = Debug|Any CPU
++		{4B2C7249-9728-451B-8C9C-F73A164703B6}.Debug|x86.Build.0 = Debug|Any CPU
+ 		{4B2C7249-9728-451B-8C9C-F73A164703B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+ 		{4B2C7249-9728-451B-8C9C-F73A164703B6}.Release|Any CPU.Build.0 = Release|Any CPU
+ 		{4B2C7249-9728-451B-8C9C-F73A164703B6}.Release|x64.ActiveCfg = Release|Any CPU
+ 		{4B2C7249-9728-451B-8C9C-F73A164703B6}.Release|x64.Build.0 = Release|Any CPU
++		{4B2C7249-9728-451B-8C9C-F73A164703B6}.Release|x86.ActiveCfg = Release|Any CPU
++		{4B2C7249-9728-451B-8C9C-F73A164703B6}.Release|x86.Build.0 = Release|Any CPU
+ 		{63A88323-2F8B-4CF1-AA17-C1372ACCA187}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+ 		{63A88323-2F8B-4CF1-AA17-C1372ACCA187}.Debug|Any CPU.Build.0 = Debug|Any CPU
+ 		{63A88323-2F8B-4CF1-AA17-C1372ACCA187}.Debug|x64.ActiveCfg = Debug|Any CPU
+ 		{63A88323-2F8B-4CF1-AA17-C1372ACCA187}.Debug|x64.Build.0 = Debug|Any CPU
++		{63A88323-2F8B-4CF1-AA17-C1372ACCA187}.Debug|x86.ActiveCfg = Debug|Any CPU
++		{63A88323-2F8B-4CF1-AA17-C1372ACCA187}.Debug|x86.Build.0 = Debug|Any CPU
+ 		{63A88323-2F8B-4CF1-AA17-C1372ACCA187}.Release|Any CPU.ActiveCfg = Release|Any CPU
+ 		{63A88323-2F8B-4CF1-AA17-C1372ACCA187}.Release|Any CPU.Build.0 = Release|Any CPU
+ 		{63A88323-2F8B-4CF1-AA17-C1372ACCA187}.Release|x64.ActiveCfg = Release|Any CPU
+ 		{63A88323-2F8B-4CF1-AA17-C1372ACCA187}.Release|x64.Build.0 = Release|Any CPU
++		{63A88323-2F8B-4CF1-AA17-C1372ACCA187}.Release|x86.ActiveCfg = Release|Any CPU
++		{63A88323-2F8B-4CF1-AA17-C1372ACCA187}.Release|x86.Build.0 = Release|Any CPU
+ 		{EE30483B-AC0F-46C1-AAF5-A5DE2B187084}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+ 		{EE30483B-AC0F-46C1-AAF5-A5DE2B187084}.Debug|Any CPU.Build.0 = Debug|Any CPU
+ 		{EE30483B-AC0F-46C1-AAF5-A5DE2B187084}.Debug|x64.ActiveCfg = Debug|Any CPU
+ 		{EE30483B-AC0F-46C1-AAF5-A5DE2B187084}.Debug|x64.Build.0 = Debug|Any CPU
++		{EE30483B-AC0F-46C1-AAF5-A5DE2B187084}.Debug|x86.ActiveCfg = Debug|Any CPU
++		{EE30483B-AC0F-46C1-AAF5-A5DE2B187084}.Debug|x86.Build.0 = Debug|Any CPU
+ 		{EE30483B-AC0F-46C1-AAF5-A5DE2B187084}.Release|Any CPU.ActiveCfg = Release|Any CPU
+ 		{EE30483B-AC0F-46C1-AAF5-A5DE2B187084}.Release|Any CPU.Build.0 = Release|Any CPU
+ 		{EE30483B-AC0F-46C1-AAF5-A5DE2B187084}.Release|x64.ActiveCfg = Release|Any CPU
+ 		{EE30483B-AC0F-46C1-AAF5-A5DE2B187084}.Release|x64.Build.0 = Release|Any CPU
++		{EE30483B-AC0F-46C1-AAF5-A5DE2B187084}.Release|x86.ActiveCfg = Release|Any CPU
++		{EE30483B-AC0F-46C1-AAF5-A5DE2B187084}.Release|x86.Build.0 = Release|Any CPU
+ 		{CE54D5D2-068A-4456-9720-2AF0688D9E7F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+ 		{CE54D5D2-068A-4456-9720-2AF0688D9E7F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+ 		{CE54D5D2-068A-4456-9720-2AF0688D9E7F}.Debug|x64.ActiveCfg = Debug|Any CPU
+ 		{CE54D5D2-068A-4456-9720-2AF0688D9E7F}.Debug|x64.Build.0 = Debug|Any CPU
++		{CE54D5D2-068A-4456-9720-2AF0688D9E7F}.Debug|x86.ActiveCfg = Debug|Any CPU
++		{CE54D5D2-068A-4456-9720-2AF0688D9E7F}.Debug|x86.Build.0 = Debug|Any CPU
+ 		{CE54D5D2-068A-4456-9720-2AF0688D9E7F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+ 		{CE54D5D2-068A-4456-9720-2AF0688D9E7F}.Release|Any CPU.Build.0 = Release|Any CPU
+ 		{CE54D5D2-068A-4456-9720-2AF0688D9E7F}.Release|x64.ActiveCfg = Release|Any CPU
+ 		{CE54D5D2-068A-4456-9720-2AF0688D9E7F}.Release|x64.Build.0 = Release|Any CPU
++		{CE54D5D2-068A-4456-9720-2AF0688D9E7F}.Release|x86.ActiveCfg = Release|Any CPU
++		{CE54D5D2-068A-4456-9720-2AF0688D9E7F}.Release|x86.Build.0 = Release|Any CPU
+ 		{9B748316-24DC-40AA-A39D-476EF83DF96C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+ 		{9B748316-24DC-40AA-A39D-476EF83DF96C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+ 		{9B748316-24DC-40AA-A39D-476EF83DF96C}.Debug|x64.ActiveCfg = Debug|Any CPU
+ 		{9B748316-24DC-40AA-A39D-476EF83DF96C}.Debug|x64.Build.0 = Debug|Any CPU
++		{9B748316-24DC-40AA-A39D-476EF83DF96C}.Debug|x86.ActiveCfg = Debug|Any CPU
++		{9B748316-24DC-40AA-A39D-476EF83DF96C}.Debug|x86.Build.0 = Debug|Any CPU
+ 		{9B748316-24DC-40AA-A39D-476EF83DF96C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+ 		{9B748316-24DC-40AA-A39D-476EF83DF96C}.Release|Any CPU.Build.0 = Release|Any CPU
+ 		{9B748316-24DC-40AA-A39D-476EF83DF96C}.Release|x64.ActiveCfg = Release|Any CPU
+ 		{9B748316-24DC-40AA-A39D-476EF83DF96C}.Release|x64.Build.0 = Release|Any CPU
++		{9B748316-24DC-40AA-A39D-476EF83DF96C}.Release|x86.ActiveCfg = Release|Any CPU
++		{9B748316-24DC-40AA-A39D-476EF83DF96C}.Release|x86.Build.0 = Release|Any CPU
+ 		{A6DCFCE5-192B-4AE1-B228-206D37A0021C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+ 		{A6DCFCE5-192B-4AE1-B228-206D37A0021C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+ 		{A6DCFCE5-192B-4AE1-B228-206D37A0021C}.Debug|x64.ActiveCfg = Debug|Any CPU
+ 		{A6DCFCE5-192B-4AE1-B228-206D37A0021C}.Debug|x64.Build.0 = Debug|Any CPU
++		{A6DCFCE5-192B-4AE1-B228-206D37A0021C}.Debug|x86.ActiveCfg = Debug|Any CPU
++		{A6DCFCE5-192B-4AE1-B228-206D37A0021C}.Debug|x86.Build.0 = Debug|Any CPU
+ 		{A6DCFCE5-192B-4AE1-B228-206D37A0021C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+ 		{A6DCFCE5-192B-4AE1-B228-206D37A0021C}.Release|Any CPU.Build.0 = Release|Any CPU
+ 		{A6DCFCE5-192B-4AE1-B228-206D37A0021C}.Release|x64.ActiveCfg = Release|Any CPU
+ 		{A6DCFCE5-192B-4AE1-B228-206D37A0021C}.Release|x64.Build.0 = Release|Any CPU
++		{A6DCFCE5-192B-4AE1-B228-206D37A0021C}.Release|x86.ActiveCfg = Release|Any CPU
++		{A6DCFCE5-192B-4AE1-B228-206D37A0021C}.Release|x86.Build.0 = Release|Any CPU
+ 		{027B5178-C306-4900-996D-97E8E43567B6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+ 		{027B5178-C306-4900-996D-97E8E43567B6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+ 		{027B5178-C306-4900-996D-97E8E43567B6}.Debug|x64.ActiveCfg = Debug|Any CPU
+ 		{027B5178-C306-4900-996D-97E8E43567B6}.Debug|x64.Build.0 = Debug|Any CPU
++		{027B5178-C306-4900-996D-97E8E43567B6}.Debug|x86.ActiveCfg = Debug|Any CPU
++		{027B5178-C306-4900-996D-97E8E43567B6}.Debug|x86.Build.0 = Debug|Any CPU
+ 		{027B5178-C306-4900-996D-97E8E43567B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+ 		{027B5178-C306-4900-996D-97E8E43567B6}.Release|Any CPU.Build.0 = Release|Any CPU
+ 		{027B5178-C306-4900-996D-97E8E43567B6}.Release|x64.ActiveCfg = Release|Any CPU
+ 		{027B5178-C306-4900-996D-97E8E43567B6}.Release|x64.Build.0 = Release|Any CPU
++		{027B5178-C306-4900-996D-97E8E43567B6}.Release|x86.ActiveCfg = Release|Any CPU
++		{027B5178-C306-4900-996D-97E8E43567B6}.Release|x86.Build.0 = Release|Any CPU
++		{E8449699-9E15-4D0D-9385-E9B5A037D1D6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
++		{E8449699-9E15-4D0D-9385-E9B5A037D1D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
++		{E8449699-9E15-4D0D-9385-E9B5A037D1D6}.Debug|x64.ActiveCfg = Debug|Any CPU
++		{E8449699-9E15-4D0D-9385-E9B5A037D1D6}.Debug|x64.Build.0 = Debug|Any CPU
++		{E8449699-9E15-4D0D-9385-E9B5A037D1D6}.Debug|x86.ActiveCfg = Debug|Any CPU
++		{E8449699-9E15-4D0D-9385-E9B5A037D1D6}.Debug|x86.Build.0 = Debug|Any CPU
++		{E8449699-9E15-4D0D-9385-E9B5A037D1D6}.Release|Any CPU.ActiveCfg = Release|Any CPU
++		{E8449699-9E15-4D0D-9385-E9B5A037D1D6}.Release|Any CPU.Build.0 = Release|Any CPU
++		{E8449699-9E15-4D0D-9385-E9B5A037D1D6}.Release|x64.ActiveCfg = Release|Any CPU
++		{E8449699-9E15-4D0D-9385-E9B5A037D1D6}.Release|x64.Build.0 = Release|Any CPU
++		{E8449699-9E15-4D0D-9385-E9B5A037D1D6}.Release|x86.ActiveCfg = Release|Any CPU
++		{E8449699-9E15-4D0D-9385-E9B5A037D1D6}.Release|x86.Build.0 = Release|Any CPU
++		{DAF00C89-07F4-4DD3-B48E-F089006FEC72}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
++		{DAF00C89-07F4-4DD3-B48E-F089006FEC72}.Debug|Any CPU.Build.0 = Debug|Any CPU
++		{DAF00C89-07F4-4DD3-B48E-F089006FEC72}.Debug|x64.ActiveCfg = Debug|Any CPU
++		{DAF00C89-07F4-4DD3-B48E-F089006FEC72}.Debug|x64.Build.0 = Debug|Any CPU
++		{DAF00C89-07F4-4DD3-B48E-F089006FEC72}.Debug|x86.ActiveCfg = Debug|Any CPU
++		{DAF00C89-07F4-4DD3-B48E-F089006FEC72}.Debug|x86.Build.0 = Debug|Any CPU
++		{DAF00C89-07F4-4DD3-B48E-F089006FEC72}.Release|Any CPU.ActiveCfg = Release|Any CPU
++		{DAF00C89-07F4-4DD3-B48E-F089006FEC72}.Release|Any CPU.Build.0 = Release|Any CPU
++		{DAF00C89-07F4-4DD3-B48E-F089006FEC72}.Release|x64.ActiveCfg = Release|Any CPU
++		{DAF00C89-07F4-4DD3-B48E-F089006FEC72}.Release|x64.Build.0 = Release|Any CPU
++		{DAF00C89-07F4-4DD3-B48E-F089006FEC72}.Release|x86.ActiveCfg = Release|Any CPU
++		{DAF00C89-07F4-4DD3-B48E-F089006FEC72}.Release|x86.Build.0 = Release|Any CPU
+ 	EndGlobalSection
+ 	GlobalSection(SolutionProperties) = preSolution
+ 		HideSolutionNode = FALSE
+@@ -148,6 +221,8 @@ Global
+ 		{9B748316-24DC-40AA-A39D-476EF83DF96C} = {8EAF9583-DC5B-46DC-A01E-47B00A1C862E}
+ 		{A6DCFCE5-192B-4AE1-B228-206D37A0021C} = {FA5D7AB8-3570-4E55-95B0-35BA6842FEE3}
+ 		{027B5178-C306-4900-996D-97E8E43567B6} = {FA5D7AB8-3570-4E55-95B0-35BA6842FEE3}
++		{E8449699-9E15-4D0D-9385-E9B5A037D1D6} = {8EAF9583-DC5B-46DC-A01E-47B00A1C862E}
++		{DAF00C89-07F4-4DD3-B48E-F089006FEC72} = {8EAF9583-DC5B-46DC-A01E-47B00A1C862E}
+ 	EndGlobalSection
+ 	GlobalSection(ExtensibilityGlobals) = postSolution
+ 		SolutionGuid = {0A99E91A-ADAB-45C3-8170-2656140F6EFA}
+diff --git a/scripts/build-naot.sh b/scripts/build-naot.sh
+index 8c01db773..57060035f 100755
+--- a/scripts/build-naot.sh
++++ b/scripts/build-naot.sh
+@@ -2,28 +2,98 @@
+ 
+ set -e
+ 
+-# Define paths and project details
+-bootstrap_project="../src/ClassicUO.Bootstrap/src/ClassicUO.Bootstrap.csproj"
+-client_project="../src/ClassicUO.Client"
+-output_directory="../bin/dist"
++# Paths are derived from this script's own location, so it runs from anywhere.
++script_dir="$(cd -P -- "$(dirname -- "$0")" && pwd -P)"
++root_dir="$(dirname "$script_dir")"
++
++client_project="$root_dir/src/ClassicUO.Client"
++launcher_project="$root_dir/src/ClassicUO.Launcher"
++plugin_host_project="$root_dir/src/ClassicUO.PluginHost"
++output_directory="$root_dir/bin/dist"
+ target=""
+ 
++# The architecture follows the machine, and can be overridden with --arch (or
++# CUO_ARCH) when cross-building. arm64 is the fallback when the machine cannot
++# be identified.
++#
++#   bash build-naot.sh --arch x64
++#
++detect_arch() {
++  case "$(uname -m)" in
++    arm64|aarch64) echo arm64 ;;
++    x86_64|amd64)  echo x64 ;;
++    *)             echo arm64 ;;
++  esac
++}
++
++arch="${CUO_ARCH:-$(detect_arch)}"
++version=""
++dev_build=0
++
++while [[ $# -gt 0 ]]; do
++  case "$1" in
++    --arch) arch="$2"; shift 2 ;;
++    --out) output_directory="$2"; shift 2 ;;
++    --version) version="$2"; shift 2 ;;
++    --dev-build) dev_build=1; shift ;;
++    *) echo "unknown option: $1"; exit 1 ;;
++  esac
++done
++
++# Extra properties, so a release build can stamp its version the way the
++# workflow in .github does.
++publish_props=()
++
++if [[ -n "$version" ]]; then
++  publish_props+=("-p:AssemblyVersion=$version" "-p:FileVersion=$version")
++fi
++
++client_props=("${publish_props[@]}")
++
++if [[ $dev_build -eq 1 ]]; then
++  client_props+=("-p:IS_DEV_BUILD=true")
++fi
++
++# Accept both spellings of each architecture.
++case $arch in
++  arm64|aarch64) arch="arm64" ;;
++  x64|x86_64|amd64) arch="x64" ;;
++  *) echo "Unsupported arch: $arch (use x64 or arm64)"; exit 1 ;;
++esac
++
+ # Determine the platform
+ platform=$(uname -s)
+ 
++# win-arm64 is not a target: of the four native libraries only SDL3 publishes an
++# ARM64 build, the others would have to be compiled by hand.
++case $platform in
++  MINGW* | CYGWIN* | MSYS*)
++    if [[ "$arch" == "arm64" ]]; then
++      echo "win-arm64 is not supported: FNA3D, FAudio and theorafile have no ARM64"
++      echo "builds. Use --arch x64, which runs under emulation on an ARM machine."
++      exit 1
++    fi
++    ;;
++esac
++
+ # Build for the appropriate platform
+ case $platform in
+   Linux)
+-    # Add Linux-specific build commands here
+-    target="linux-x64"
++    target="linux-$arch"
+     ;;
+   Darwin)
+-    # Add macOS-specific build commands here
+-   target="osx-x64"
++    target="osx-$arch"
+     ;;
+   MINGW* | CYGWIN*)
+-    # Add Windows-specific build commands here
+-    target="win-x64"
++    target="win-$arch"
++
++    # NativeAOT finds the MSVC linker through vcvarsall.bat, and the one of
++    # Visual Studio 18 calls vswhere.exe by name: without the Installer folder on
++    # PATH its error text ends up in the linker path and the link fails.
++    vs_installer="$(cygpath -u "${PROGRAMFILES:-C:\\Program Files} (x86)")/Microsoft Visual Studio/Installer"
++    if [[ -d "$vs_installer" ]]; then
++      export PATH="$vs_installer:$PATH"
++    fi
+     ;;
+   *)
+     echo "Unsupported platform: $platform"
+@@ -31,6 +101,93 @@ case $platform in
+     ;;
+ esac
+ 
++echo "Building for $target"
++
++# ./ClassicUO opens the launcher, which shows the shard list and then replaces
++# itself with the client. Arguments skip the window and go straight to the client.
++write_launcher() {
++  case $platform in
++    MINGW* | CYGWIN* | MSYS*) return ;;
++  esac
++
++  cat > "$output_directory/ClassicUO" <<LAUNCHER
++#!/bin/bash
++cd "\$(cd -P -- "\$(dirname -- "\$0")" && pwd -P)"
++exec ./ClassicUOLauncher "\$@"
++LAUNCHER
++}
++
++# Earlier builds carried another plugin host: a bootstrap, a Mono host with its class
++# libraries, and the client as a library. bin/dist is incremental and may hold
++# user data, so remove what is left of it rather than wiping the folder.
++strip_old_plugin_host() {
++  rm -rf "$output_directory"/cuo.dylib "$output_directory"/cuo.dylib.dSYM \
++         "$output_directory"/cuo.dll "$output_directory"/cuo.so "$output_directory"/cuo.so.dbg
++
++  rm -f "$output_directory"/ClassicUO.bin.* \
++        "$output_directory"/ClassicUO.exe \
++        "$output_directory"/ClassicUO.exe.config \
++        "$output_directory"/ClassicUO.pdb \
++        "$output_directory"/monoconfig \
++        "$output_directory"/monomachineconfig
++
++  local name
++  for name in Accessibility Microsoft.CSharp Mono.Posix Mono.Security mscorlib netstandard \
++              System System.Buffers System.Configuration System.Core System.Data System.Drawing \
++              System.IO.Compression System.IO.Compression.FileSystem System.Memory System.Numerics \
++              System.Numerics.Vectors System.Runtime.CompilerServices.Unsafe \
++              System.Runtime.Serialization System.Security System.ValueTuple System.Windows.Forms \
++              System.Xml System.Xml.Linq; do
++    rm -f "$output_directory/$name.dll"
++  done
++}
++
++chmod_outputs() {
++  # The launcher script is generated here, and a copy can lose the executable
++  # bit (a zip round trip, a checkout on Windows, an MSBuild Copy that does not
++  # preserve modes). Set it here so bin/dist is runnable no matter how it got there.
++  case $platform in
++    MINGW* | CYGWIN* | MSYS*) return ;;
++  esac
++
++  # Written as an if, not as "[[ -f ]] && chmod": an unmatched glob makes the
++  # test fail, and a false test as the last statement of a function returns
++  # non-zero, which under set -e kills the script right here.
++  for f in "$output_directory"/ClassicUO "$output_directory"/ClassicUOLauncher "$output_directory"/cuo; do
++    if [[ -f "$f" ]]; then
++      chmod +x "$f"
++    fi
++  done
++}
++
++# An intermediate build left from the plugin-host days (the client as a shared
++# library) goes stale in ways MSBuild does not notice, since no source changed:
++# publishing then fails on the ILC step.
++rm -rf "$root_dir/src/ClassicUO.Client/obj/Release/net10.0/$target"
++
++# bin/dist is incremental, so a build for another architecture would leave a
++# payload mixing the two. Drop what belongs to an architecture when it changes,
++# keeping settings and profiles if the folder has been played from.
++marker="$output_directory/.build-target"
++
++if [[ -f "$marker" && "$(cat "$marker")" != "$target" ]]; then
++  echo "Target changed ($(cat "$marker") -> $target), clearing the old payload."
++
++  rm -rf "$output_directory"/cuo "$output_directory"/cuo.dSYM \
++         "$output_directory"/ClassicUOLauncher \
++         "$output_directory"/*.dylib "$output_directory"/*.so*
++fi
++
++dotnet publish "$client_project" -c Release -r $target -o "$output_directory" "${client_props[@]}"
++dotnet publish "$launcher_project" -c Release -r $target -o "$output_directory" "${publish_props[@]}"
++
++# Managed plugins run on the .NET runtime the client starts through hostfxr
++# (CoreClrPluginHost.cs). The host is plain IL, the same file on every platform.
++dotnet publish "$plugin_host_project" -c Release -o "$output_directory" "${publish_props[@]}"
++
++strip_old_plugin_host
++write_launcher
++chmod_outputs
+ 
+-dotnet publish "$bootstrap_project" -c Release -o "$output_directory"
+-dotnet publish "$client_project" -c Release -p:NativeLib=Shared -p:OutputType=Library -r $target -o "$output_directory"
+\ No newline at end of file
++mkdir -p "$output_directory"
++echo "$target" > "$marker"
+diff --git a/src/ClassicUO.Client/ClassicUO.Client.csproj b/src/ClassicUO.Client/ClassicUO.Client.csproj
+index dbe54edee..6456d9dee 100644
+--- a/src/ClassicUO.Client/ClassicUO.Client.csproj
++++ b/src/ClassicUO.Client/ClassicUO.Client.csproj
+@@ -2,6 +2,9 @@
+ 
+   <PropertyGroup>
+     <OutputType>Exe</OutputType>
++    <!-- No console window next to the game on Windows. Only for a published RID:
++         passed on the command line it would also apply to the referenced libraries. -->
++    <OutputType Condition="$(RuntimeIdentifier.StartsWith('win-'))">WinExe</OutputType>
+     <ApplicationIcon>cuoicon.ico</ApplicationIcon>
+     <AssemblyName>cuo</AssemblyName>
+     <RootNamespace>ClassicUO</RootNamespace>

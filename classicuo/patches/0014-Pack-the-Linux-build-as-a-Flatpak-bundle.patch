@@ -1,0 +1,56 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 09:02:04 +0200
+Subject: [PATCH] Pack the Linux build as a Flatpak bundle
+
+scripts/make-flatpak.sh packs bin/dist into a .flatpak on the freedesktop 25.08
+runtime, with the .NET 10 runtime plugins need taken from the SDK extension.
+The wrapper runs launcher and client in the app's data folder
+(~/.var/app/io.github.Norelec91.WispUO/data), copies the bundled plugins there
+on first run since an assistant writes into its own folder, and points
+DOTNET_ROOT at the bundled runtime. Permissions: network, X11 for the launcher,
+Wayland, PulseAudio, the GPU and the home folder read only for the game files.
+
+On Linux build.sh ends with this step when flatpak-builder is installed;
+--no-flatpak skips it. For distributing the build yourself only: it is not a
+Flathub manifest.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ scripts/build-naot.sh | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/scripts/build-naot.sh b/scripts/build-naot.sh
+index 3fd12ae59..c3ab6fb85 100755
+--- a/scripts/build-naot.sh
++++ b/scripts/build-naot.sh
+@@ -29,6 +29,7 @@ detect_arch() {
+ arch="${CUO_ARCH:-$(detect_arch)}"
+ version=""
+ dev_build=0
++flatpak=1
+ 
+ while [[ $# -gt 0 ]]; do
+   case "$1" in
+@@ -36,6 +37,7 @@ while [[ $# -gt 0 ]]; do
+     --out) output_directory="$2"; shift 2 ;;
+     --version) version="$2"; shift 2 ;;
+     --dev-build) dev_build=1; shift ;;
++    --no-flatpak) flatpak=0; shift ;;
+     *) echo "unknown option: $1"; exit 1 ;;
+   esac
+ done
+@@ -209,3 +211,12 @@ dotnet publish "$plugin_host_project" -c Release -o "$bin_directory" "${publish_
+ strip_symbols
+ write_launcher
+ chmod_outputs
++
++# On Linux the build is also packed as a Flatpak bundle, when the tools are there.
++if [[ "$platform" == "Linux" && $flatpak -eq 1 ]]; then
++  if command -v flatpak-builder >/dev/null 2>&1; then
++    bash "$script_dir/make-flatpak.sh" --dist "$output_directory"
++  else
++    echo "flatpak-builder not installed: no Flatpak bundle (--no-flatpak hides this)."
++  fi
++fi

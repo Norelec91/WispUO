@@ -1,0 +1,59 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 09:02:04 +0200
+Subject: [PATCH] Keep debug symbols and the build marker out of bin/dist
+
+The .pdb/.dbg/.dSYM files were most of the folder's size and are of no use to
+players; the copies under bin/Release and obj stay for debugging. The
+architecture marker moves next to the folder, as bin/dist.target.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ scripts/build-naot.sh | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/scripts/build-naot.sh b/scripts/build-naot.sh
+index 57060035f..50487bcfe 100755
+--- a/scripts/build-naot.sh
++++ b/scripts/build-naot.sh
+@@ -142,6 +142,13 @@ strip_old_plugin_host() {
+   done
+ }
+ 
++# Debug symbols are for whoever debugs the build, not for players, and they are
++# most of the folder's size (the launcher's and Skia's alone are ~160 MB). The
++# copies under bin/Release and obj stay for debugging.
++strip_symbols() {
++  rm -rf "$output_directory"/*.pdb "$output_directory"/*.dbg "$output_directory"/*.dSYM
++}
++
+ chmod_outputs() {
+   # The launcher script is generated here, and a copy can lose the executable
+   # bit (a zip round trip, a checkout on Windows, an MSBuild Copy that does not
+@@ -167,8 +174,13 @@ rm -rf "$root_dir/src/ClassicUO.Client/obj/Release/net10.0/$target"
+ 
+ # bin/dist is incremental, so a build for another architecture would leave a
+ # payload mixing the two. Drop what belongs to an architecture when it changes,
+-# keeping settings and profiles if the folder has been played from.
+-marker="$output_directory/.build-target"
++# keeping settings and profiles if the folder has been played from. The marker
++# sits next to the folder rather than in it, which is what players see.
++marker="${output_directory%/}.target"
++
++if [[ -f "$output_directory/.build-target" ]]; then
++  mv "$output_directory/.build-target" "$marker"
++fi
+ 
+ if [[ -f "$marker" && "$(cat "$marker")" != "$target" ]]; then
+   echo "Target changed ($(cat "$marker") -> $target), clearing the old payload."
+@@ -186,8 +198,8 @@ dotnet publish "$launcher_project" -c Release -r $target -o "$output_directory"
+ dotnet publish "$plugin_host_project" -c Release -o "$output_directory" "${publish_props[@]}"
+ 
+ strip_old_plugin_host
++strip_symbols
+ write_launcher
+ chmod_outputs
+ 
+-mkdir -p "$output_directory"
+ echo "$target" > "$marker"

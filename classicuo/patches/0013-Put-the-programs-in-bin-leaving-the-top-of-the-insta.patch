@@ -1,0 +1,138 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 09:02:04 +0200
+Subject: [PATCH] Put the programs in bin, leaving the top of the install to
+ the player
+
+The top of bin/dist now holds only the launcher (ClassicUO.exe on Windows, the
+ClassicUO script elsewhere), settings.json, launcher.json and Data. The client,
+the launcher, the plugin host and every native library go in bin.
+
+- Client and launcher keep running in the top folder, where the client already
+  looks for settings.json and Data (its working directory), so the client is
+  unchanged.
+- On Windows the launcher is ClassicUO.exe at the top and adds bin to the DLL
+  search path before Avalonia loads Skia, HarfBuzz and ANGLE; elsewhere it
+  lives in bin and finds them next to itself. It starts bin/cuo.
+- bin holds no user data, so the build empties and refills it every time:
+  nothing stale survives, architectures cannot mix, and the build marker is
+  gone. A flat build from before is cleared, keeping the user's files.
+- make-macos-app.sh and scripts/README.md follow the new layout.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ scripts/build-naot.sh | 64 +++++++++++++++++++++++--------------------
+ 1 file changed, 35 insertions(+), 29 deletions(-)
+
+diff --git a/scripts/build-naot.sh b/scripts/build-naot.sh
+index 50487bcfe..3fd12ae59 100755
+--- a/scripts/build-naot.sh
++++ b/scripts/build-naot.sh
+@@ -103,20 +103,43 @@ esac
+ 
+ echo "Building for $target"
+ 
+-# ./ClassicUO opens the launcher, which shows the shard list and then replaces
+-# itself with the client. Arguments skip the window and go straight to the client.
++# The top of bin/dist holds what a player deals with: the launcher, settings.json,
++# launcher.json and Data. Everything else - client, launcher, plugin host and their
++# native libraries - goes in bin, which holds no user data and is rebuilt from
++# scratch every time, so nothing stale survives and architectures never mix.
++bin_directory="$output_directory/bin"
++
++# ClassicUO opens the launcher, which shows the shard list and then starts the
++# client. Arguments skip the window and go straight to the client. Both run in the
++# top folder, which is where the client looks for settings.json and Data.
+ write_launcher() {
+   case $platform in
+-    MINGW* | CYGWIN* | MSYS*) return ;;
++    MINGW* | CYGWIN* | MSYS*)
++      # No script on Windows, it would open a console: the launcher itself is
++      # ClassicUO.exe and loads its libraries from bin (Program.UseBinFolder).
++      mv -f "$bin_directory/ClassicUOLauncher.exe" "$output_directory/ClassicUO.exe"
++      return
++      ;;
+   esac
+ 
+   cat > "$output_directory/ClassicUO" <<LAUNCHER
+ #!/bin/bash
+ cd "\$(cd -P -- "\$(dirname -- "\$0")" && pwd -P)"
+-exec ./ClassicUOLauncher "\$@"
++exec ./bin/ClassicUOLauncher "\$@"
+ LAUNCHER
+ }
+ 
++# Builds before bin existed put everything at the top, next to the user's files.
++# Remove that payload, and only that: settings, launcher.json, Data and Logs stay.
++strip_flat_layout() {
++  rm -rf "$output_directory"/cuo "$output_directory"/cuo.exe "$output_directory"/cuo.dSYM \
++         "$output_directory"/ClassicUOLauncher "$output_directory"/ClassicUOLauncher.exe \
++         "$output_directory"/ClassicUO.PluginHost.* "$output_directory"/FNA.dll.config \
++         "$output_directory"/D3D12 "$output_directory"/*.dll "$output_directory"/*.dylib \
++         "$output_directory"/*.so* "$output_directory"/*.pdb "$output_directory"/*.dbg \
++         "$output_directory"/.build-target "${output_directory%/}.target"
++}
++
+ # Earlier builds carried another plugin host: a bootstrap, a Mono host with its class
+ # libraries, and the client as a library. bin/dist is incremental and may hold
+ # user data, so remove what is left of it rather than wiping the folder.
+@@ -146,7 +169,7 @@ strip_old_plugin_host() {
+ # most of the folder's size (the launcher's and Skia's alone are ~160 MB). The
+ # copies under bin/Release and obj stay for debugging.
+ strip_symbols() {
+-  rm -rf "$output_directory"/*.pdb "$output_directory"/*.dbg "$output_directory"/*.dSYM
++  rm -rf "$bin_directory"/*.pdb "$bin_directory"/*.dbg "$bin_directory"/*.dSYM
+ }
+ 
+ chmod_outputs() {
+@@ -160,7 +183,7 @@ chmod_outputs() {
+   # Written as an if, not as "[[ -f ]] && chmod": an unmatched glob makes the
+   # test fail, and a false test as the last statement of a function returns
+   # non-zero, which under set -e kills the script right here.
+-  for f in "$output_directory"/ClassicUO "$output_directory"/ClassicUOLauncher "$output_directory"/cuo; do
++  for f in "$output_directory"/ClassicUO "$bin_directory"/ClassicUOLauncher "$bin_directory"/cuo; do
+     if [[ -f "$f" ]]; then
+       chmod +x "$f"
+     fi
+@@ -172,34 +195,17 @@ chmod_outputs() {
+ # publishing then fails on the ILC step.
+ rm -rf "$root_dir/src/ClassicUO.Client/obj/Release/net10.0/$target"
+ 
+-# bin/dist is incremental, so a build for another architecture would leave a
+-# payload mixing the two. Drop what belongs to an architecture when it changes,
+-# keeping settings and profiles if the folder has been played from. The marker
+-# sits next to the folder rather than in it, which is what players see.
+-marker="${output_directory%/}.target"
+-
+-if [[ -f "$output_directory/.build-target" ]]; then
+-  mv "$output_directory/.build-target" "$marker"
+-fi
+-
+-if [[ -f "$marker" && "$(cat "$marker")" != "$target" ]]; then
+-  echo "Target changed ($(cat "$marker") -> $target), clearing the old payload."
+-
+-  rm -rf "$output_directory"/cuo "$output_directory"/cuo.dSYM \
+-         "$output_directory"/ClassicUOLauncher \
+-         "$output_directory"/*.dylib "$output_directory"/*.so*
+-fi
++strip_old_plugin_host
++strip_flat_layout
++rm -rf "$bin_directory"
+ 
+-dotnet publish "$client_project" -c Release -r $target -o "$output_directory" "${client_props[@]}"
+-dotnet publish "$launcher_project" -c Release -r $target -o "$output_directory" "${publish_props[@]}"
++dotnet publish "$client_project" -c Release -r $target -o "$bin_directory" "${client_props[@]}"
++dotnet publish "$launcher_project" -c Release -r $target -o "$bin_directory" "${publish_props[@]}"
+ 
+ # Managed plugins run on the .NET runtime the client starts through hostfxr
+ # (CoreClrPluginHost.cs). The host is plain IL, the same file on every platform.
+-dotnet publish "$plugin_host_project" -c Release -o "$output_directory" "${publish_props[@]}"
++dotnet publish "$plugin_host_project" -c Release -o "$bin_directory" "${publish_props[@]}"
+ 
+-strip_old_plugin_host
+ strip_symbols
+ write_launcher
+ chmod_outputs
+-
+-echo "$target" > "$marker"
