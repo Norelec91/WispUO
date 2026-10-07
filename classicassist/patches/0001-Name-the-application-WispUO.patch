@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 18:42:04 +0200
+Subject: [PATCH] Name the application WispUO
+
+Avalonia calls an unnamed application "Avalonia Application", and macOS shows
+that in the menu bar. The name is set in the constructor, before the platform
+starts: set from App.axaml it came too late for the menu bar.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ ClassicAssist.Avalonia/App.axaml.cs | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/ClassicAssist.Avalonia/App.axaml.cs b/ClassicAssist.Avalonia/App.axaml.cs
+index cb63037..1cc498d 100644
+--- a/ClassicAssist.Avalonia/App.axaml.cs
++++ b/ClassicAssist.Avalonia/App.axaml.cs
+@@ -12,6 +12,12 @@ namespace ClassicAssist.Avalonia;
+ 
+ public class App : Application
+ {
++    // Set before the platform starts: from App.axaml it came too late for the macOS menu bar.
++    public App()
++    {
++        Name = "WispUO";
++    }
++
+     public override void Initialize()
+     {
+         AvaloniaXamlLoader.Load( this );

@@ -1,0 +1,95 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 19:14:26 +0200
+Subject: [PATCH] Start the UI again if it goes away while the game runs
+
+The UI is meant to live as long as the game. If its process dies anyway, the
+plugin starts it again, three times at most, unless the game is closing.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ ClassicAssist.Plugin/PluginEngine.cs | 48 ++++++++++++++++++++++++++--
+ 1 file changed, 45 insertions(+), 3 deletions(-)
+
+diff --git a/ClassicAssist.Plugin/PluginEngine.cs b/ClassicAssist.Plugin/PluginEngine.cs
+index 0cb9101..3e1fb8c 100644
+--- a/ClassicAssist.Plugin/PluginEngine.cs
++++ b/ClassicAssist.Plugin/PluginEngine.cs
+@@ -509,9 +509,12 @@ namespace ClassicAssist.Plugin
+         ///     The game is mid-startup here; blocking it on a child process that may never appear would hang
+         ///     the client rather than merely leave it without an assistant.
+         /// </summary>
+-        private static void LaunchUI()
++        private static void LaunchUI( bool restart = false )
+         {
+-            ReflectionImpl.Initialize( ClassicAssembly, CUOPath, TickWorkQueue, Move );
++            if ( !restart )
++            {
++                ReflectionImpl.Initialize( ClassicAssembly, CUOPath, TickWorkQueue, Move );
++            }
+ 
+             string exePath = GetUIPath();
+ 
+@@ -644,7 +647,12 @@ namespace ClassicAssist.Plugin
+ 
+                     JsonRpc rpc = new JsonRpc( CreateMessagePackHandler( pipe ), _hostMethods );
+                     rpc.StartListening();
+-                    rpc.Disconnected += ( _, _ ) => Detach();
++                    rpc.Disconnected += ( _, _ ) =>
++                    {
++                        // a pipe of this name allows one instance: free it for the next UI
++                        pipe.Dispose();
++                        OnUIDisconnected();
++                    };
+ 
+                     _plugin = rpc.Attach<IPluginMethods>();
+ 
+@@ -792,6 +800,37 @@ namespace ClassicAssist.Plugin
+             ShutdownResetEvent.Set();
+         }
+ 
++        private const int MAX_UI_RESTARTS = 3;
++        private static volatile bool _clientClosing;
++        private static int _uiRestarts;
++
++        /// <summary>
++        ///     The UI lives as long as the game: closing or quitting its window only hides it. If its
++        ///     process goes away anyway while the game runs, it is started again, a few times at most
++        ///     so that a UI that keeps crashing does not loop forever.
++        /// </summary>
++        private static void OnUIDisconnected()
++        {
++            Detach();
++
++            if ( _clientClosing || Interlocked.Increment( ref _uiRestarts ) > MAX_UI_RESTARTS )
++            {
++                return;
++            }
++
++            Trace( "the UI went away while the game runs, starting it again" );
++
++            try
++            {
++                LaunchUI( restart: true );
++            }
++            catch ( Exception e )
++            {
++                // raised from the RPC's disconnect event, where it would vanish unseen
++                Trace( $"couldn't start the UI again: {e.Message}" );
++            }
++        }
++
+         private static void OnFocusChanged( bool focus )
+         {
+             _clientHasFocus = focus;
+@@ -893,6 +932,9 @@ namespace ClassicAssist.Plugin
+ 
+         private static void OnClientClosing()
+         {
++            // from here on a lost UI is expected, not something to recover from
++            _clientClosing = true;
++
+             PacketLatencyLog.Shutdown();
+ 
+             if ( _plugin == null )

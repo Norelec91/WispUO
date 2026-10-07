@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 18:46:34 +0200
+Subject: [PATCH] WispUO's icon for the windows and, on macOS, the Dock
+
+The windows take WispUO's icon instead of ClassicAssist's logo. macOS takes the
+Dock icon from the application bundle, which this process does not have, and
+Avalonia does not pass Window.Icon on, so the icon goes to NSApplication.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ ClassicAssist.Avalonia/App.axaml    | 2 +-
+ ClassicAssist.Avalonia/App.axaml.cs | 2 ++
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/ClassicAssist.Avalonia/App.axaml b/ClassicAssist.Avalonia/App.axaml
+index cadeec7..cc3d0e9 100644
+--- a/ClassicAssist.Avalonia/App.axaml
++++ b/ClassicAssist.Avalonia/App.axaml
+@@ -25,7 +25,7 @@
+          _NET_WM_ICON, which Avalonia sets from Window.Icon, so without this every window is iconless on
+          Linux even though the same build looks fine on Windows. -->
+     <Style Selector="Window">
+-      <Setter Property="Icon" Value="avares://ClassicAssist.Avalonia/Assets/logo.ico"/>
++      <Setter Property="Icon" Value="avares://ClassicAssist.Avalonia/Assets/wispuo.ico"/>
+     </Style>
+     <Style Selector="Button">
+       <Setter Property="HorizontalAlignment" Value="Stretch"/>
+diff --git a/ClassicAssist.Avalonia/App.axaml.cs b/ClassicAssist.Avalonia/App.axaml.cs
+index 1cc498d..aaf679d 100644
+--- a/ClassicAssist.Avalonia/App.axaml.cs
++++ b/ClassicAssist.Avalonia/App.axaml.cs
+@@ -25,6 +25,8 @@ public class App : Application
+ 
+     public override void OnFrameworkInitializationCompleted()
+     {
++        MacDockIcon.Set( "avares://ClassicAssist.Avalonia/Assets/wispuo.ico" );
++
+         if ( ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop )
+         {
+             return;

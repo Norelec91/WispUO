@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 19:14:27 +0200
+Subject: [PATCH] Closing or quitting the main window puts it away
+
+The assistant lives as long as the game. Closing the main window, or quitting
+from the macOS menu, hides it on macOS, where the Dock icon or the menu bring
+it back, and minimizes it elsewhere. The application menu gets a "Show
+ClassicAssist" item instead of Avalonia's "About Avalonia".
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ ClassicAssist.Avalonia/App.axaml.cs | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/ClassicAssist.Avalonia/App.axaml.cs b/ClassicAssist.Avalonia/App.axaml.cs
+index aaf679d..cdf6dc3 100644
+--- a/ClassicAssist.Avalonia/App.axaml.cs
++++ b/ClassicAssist.Avalonia/App.axaml.cs
+@@ -60,6 +60,7 @@ public class App : Application
+ 
+                 desktop.MainWindow = mainWindow;
+                 UiHost.MainWindow = mainWindow;
++                WindowKeeper.Install( desktop, mainWindow );
+ 
+                 // Shown explicitly: the lifetime only auto-shows a MainWindow that was already set
+                 // when OnFrameworkInitializationCompleted returned, which by now it has.

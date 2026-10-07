@@ -1,0 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 20:20:13 +0200
+Subject: [PATCH] The application menu is set before the platform starts
+
+macOS takes the application menu when the platform starts; finding none of
+ours then, Avalonia put its own with "About Avalonia" and never looked again.
+The "Show ClassicAssist" menu is now set from the App constructor.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ ClassicAssist.Avalonia/App.axaml.cs | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/ClassicAssist.Avalonia/App.axaml.cs b/ClassicAssist.Avalonia/App.axaml.cs
+index cdf6dc3..1760fec 100644
+--- a/ClassicAssist.Avalonia/App.axaml.cs
++++ b/ClassicAssist.Avalonia/App.axaml.cs
+@@ -16,6 +16,7 @@ public class App : Application
+     public App()
+     {
+         Name = "WispUO";
++        WindowKeeper.InstallMenu( this );
+     }
+ 
+     public override void Initialize()
