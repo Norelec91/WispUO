@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 08:58:25 +0200
+Subject: [PATCH] Probe the audio device with a legal sample rate
+
+The probe only wants to know whether a device exists, but FNA checks the rate
+before touching the device, so a zero threw ArgumentOutOfRangeException instead
+of the NoAudioHardwareException it looks for.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ src/ClassicUO.Client/Game/Managers/AudioManager.cs | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/src/ClassicUO.Client/Game/Managers/AudioManager.cs b/src/ClassicUO.Client/Game/Managers/AudioManager.cs
+index 83a148c00..94ce0be14 100644
+--- a/src/ClassicUO.Client/Game/Managers/AudioManager.cs
++++ b/src/ClassicUO.Client/Game/Managers/AudioManager.cs
+@@ -26,7 +26,11 @@ namespace ClassicUO.Game.Managers
+         {
+             try
+             {
+-                new DynamicSoundEffectInstance(0, AudioChannels.Stereo).Dispose();
++                // Only here to find out whether an audio device exists at all. The
++                // sample rate has to be a legal one: FNA validates it before it ever
++                // touches the device, so a zero throws ArgumentOutOfRangeException
++                // instead of the NoAudioHardwareException this is looking for.
++                new DynamicSoundEffectInstance(44100, AudioChannels.Stereo).Dispose();
+             }
+             catch (NoAudioHardwareException ex)
+             {

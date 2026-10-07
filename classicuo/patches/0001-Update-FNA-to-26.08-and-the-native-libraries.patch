@@ -1,0 +1,76 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 08:58:12 +0200
+Subject: [PATCH] Update FNA to 26.08 and the native libraries
+
+Current SDL3, FNA3D, FAudio and theorafile for Windows x64, Linux x64 and macOS
+(universal dylibs). FNA3D no longer has a Vulkan driver, so MoltenVK and its
+ICD go. The client project names the native folders once, in properties.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ src/ClassicUO.Client/ClassicUO.Client.csproj | 31 ++++++++++----------
+ 1 file changed, 16 insertions(+), 15 deletions(-)
+
+diff --git a/src/ClassicUO.Client/ClassicUO.Client.csproj b/src/ClassicUO.Client/ClassicUO.Client.csproj
+index c2de090aa..20737dd64 100644
+--- a/src/ClassicUO.Client/ClassicUO.Client.csproj
++++ b/src/ClassicUO.Client/ClassicUO.Client.csproj
+@@ -70,11 +70,20 @@
+     </EmbeddedResource>
+   </ItemGroup>
+ 
++  <PropertyGroup>
++    <_IsWindows Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">true</_IsWindows>
++    <_IsMacOS Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">true</_IsMacOS>
++    <_IsLinux Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">true</_IsLinux>
++
++    <_WindowsNativeDir>x64</_WindowsNativeDir>
++
++    <_LinuxNativeDir>lib64</_LinuxNativeDir>
++  </PropertyGroup>
++
+   <ItemGroup>
+-    <DataFiles_x64 Include="$(ProjectDir)..\..\external\x64\*.*" />
+-    <DataFiles_lib64 Include="$(ProjectDir)..\..\external\lib64\*.*" />
++    <DataFiles_win Include="$(ProjectDir)..\..\external\$(_WindowsNativeDir)\*.*" />
++    <DataFiles_linux Include="$(ProjectDir)..\..\external\$(_LinuxNativeDir)\*.*" />
+     <DataFiles_osx Include="$(ProjectDir)..\..\external\osx\*.*" />
+-    <DataFiles_vulkan Include="$(ProjectDir)..\..\external\vulkan\icd.d\*.*" />
+   </ItemGroup>
+ 
+   <ItemGroup>
+@@ -83,17 +92,10 @@
+     </Reference>
+   </ItemGroup>
+ 
+-  <PropertyGroup>
+-    <_IsWindows Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' == 'true'">true</_IsWindows>
+-    <_IsMacOS Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">true</_IsMacOS>
+-    <_IsLinux Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">true</_IsLinux>
+-  </PropertyGroup>
+-
+   <Target Name="CopyExternalDeps_build" AfterTargets="Build">
+-    <Copy SourceFiles="@(DataFiles_x64)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="'$(_IsWindows)' == 'true'" />
+-    <Copy SourceFiles="@(DataFiles_lib64)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="'$(_IsLinux)' == 'true'" />
++    <Copy SourceFiles="@(DataFiles_win)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="'$(_IsWindows)' == 'true'" />
++    <Copy SourceFiles="@(DataFiles_linux)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="'$(_IsLinux)' == 'true'" />
+     <Copy SourceFiles="@(DataFiles_osx)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="'$(_IsMacOS)' == 'true'" />
+-    <Copy SourceFiles="@(DataFiles_vulkan)" DestinationFolder="$(OutputPath)\vulkan\icd.d\" SkipUnchangedFiles="true" Condition="'$(_IsMacOS)' == 'true'" />
+   </Target>
+ 
+   <Target Name="CopyExternalDeps_publish" AfterTargets="Publish">
+@@ -101,10 +103,9 @@
+       <MonockickstartPath Include="$(ProjectDir)..\..\tools\monokickstart\*.*" />
+     </ItemGroup>
+ 
+-    <Copy SourceFiles="@(DataFiles_x64)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="'$(_IsWindows)' == 'true'" />
+-    <Copy SourceFiles="@(DataFiles_lib64)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="'$(_IsLinux)' == 'true'" />
++    <Copy SourceFiles="@(DataFiles_win)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="'$(_IsWindows)' == 'true'" />
++    <Copy SourceFiles="@(DataFiles_linux)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="'$(_IsLinux)' == 'true'" />
+     <Copy SourceFiles="@(DataFiles_osx)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="'$(_IsMacOS)' == 'true'" />
+-    <Copy SourceFiles="@(DataFiles_vulkan)" DestinationFolder="$(PublishDir)\vulkan\icd.d\" SkipUnchangedFiles="true" Condition="'$(_IsMacOS)' == 'true'" />
+ 
+     <Copy SourceFiles="@(MonockickstartPath)" DestinationFolder="$(PublishDir)\" SkipUnchangedFiles="true" Condition="'$(_IsLinux)' == 'true' Or '$(_IsMacOS)' == 'true'" />
+ 

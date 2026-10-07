@@ -1,0 +1,38 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 08:58:13 +0200
+Subject: [PATCH] Ship the native libraries for Linux arm64
+
+external/libaarch64 holds the arm64 builds of SDL3, FNA3D, FAudio and
+theorafile, and the client project picks it by target architecture: from the
+RID when publishing, from the build machine otherwise. The macOS dylibs are
+universal already; Windows stays x64, nobody publishes the natives for arm64.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ src/ClassicUO.Client/ClassicUO.Client.csproj | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/src/ClassicUO.Client/ClassicUO.Client.csproj b/src/ClassicUO.Client/ClassicUO.Client.csproj
+index 20737dd64..9ad64c3c8 100644
+--- a/src/ClassicUO.Client/ClassicUO.Client.csproj
++++ b/src/ClassicUO.Client/ClassicUO.Client.csproj
+@@ -75,9 +75,17 @@
+     <_IsMacOS Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' == 'true'">true</_IsMacOS>
+     <_IsLinux Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' == 'true'">true</_IsLinux>
+ 
++    <!-- The Mach-O dylibs in external/osx are universal, but ELF natives are not,
++         so Linux picks its folder by target architecture: from the RID when
++         publishing, from the build machine otherwise. Windows ships x64 only,
++         since nobody publishes FNA3D, FAudio and theorafile for win-arm64. -->
++    <_IsArm64 Condition="'$(RuntimeIdentifier)' != '' And $(RuntimeIdentifier.EndsWith('arm64'))">true</_IsArm64>
++    <_IsArm64 Condition="'$(RuntimeIdentifier)' == '' And '$([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture)' == 'Arm64'">true</_IsArm64>
++
+     <_WindowsNativeDir>x64</_WindowsNativeDir>
+ 
+     <_LinuxNativeDir>lib64</_LinuxNativeDir>
++    <_LinuxNativeDir Condition="'$(_IsArm64)' == 'true'">libaarch64</_LinuxNativeDir>
+   </PropertyGroup>
+ 
+   <ItemGroup>

@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 08:58:13 +0200
+Subject: [PATCH] Fetch the native libraries with a script, and warn when they
+ are missing
+
+scripts/fetch-natives.sh downloads the natives again and external/NATIVES.md
+says where each one comes from. A build with an empty native folder now warns
+instead of failing later with a DllNotFoundException at startup.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ src/ClassicUO.Client/ClassicUO.Client.csproj | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/src/ClassicUO.Client/ClassicUO.Client.csproj b/src/ClassicUO.Client/ClassicUO.Client.csproj
+index 3fe18429a..e2739f23b 100644
+--- a/src/ClassicUO.Client/ClassicUO.Client.csproj
++++ b/src/ClassicUO.Client/ClassicUO.Client.csproj
+@@ -105,6 +105,21 @@
+     </Reference>
+   </ItemGroup>
+ 
++  <!-- Missing natives only show up as a DllNotFoundException at startup, which is
++       a miserable way to find out the folder was never populated. Counts actual
++       libraries, so a folder holding just a README still counts as empty. -->
++  <Target Name="CheckNativeDeps" BeforeTargets="Build">
++    <ItemGroup>
++      <_NativeLibs_win Include="$(ProjectDir)..\..\external\$(_WindowsNativeDir)\*.dll" />
++      <_NativeLibs_linux Include="$(ProjectDir)..\..\external\$(_LinuxNativeDir)\*.so*" />
++    </ItemGroup>
++
++    <Warning Condition="'$(_IsWindows)' == 'true' And '@(_NativeLibs_win)' == ''"
++             Text="No native libraries in external\x64: SDL3, FNA3D, FAudio and theorafile are missing, run scripts/fetch-natives.sh." />
++    <Warning Condition="'$(_IsLinux)' == 'true' And '@(_NativeLibs_linux)' == ''"
++             Text="No native libraries in external/$(_LinuxNativeDir): SDL3, FNA3D, FAudio and theorafile are missing, run scripts/fetch-natives.sh." />
++  </Target>
++
+   <Target Name="CopyExternalDeps_build" AfterTargets="Build">
+     <Copy SourceFiles="@(DataFiles_win)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="'$(_IsWindows)' == 'true'" />
+     <Copy SourceFiles="@(DataFiles_linux)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" Condition="'$(_IsLinux)' == 'true'" />

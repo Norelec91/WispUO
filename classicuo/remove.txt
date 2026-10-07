@@ -1,0 +1,3 @@
+external/osx/libMoltenVK.dylib
+external/osx/libvulkan.1.dylib
+external/vulkan/icd.d/MoltenVK_icd.json
