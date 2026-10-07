@@ -1,0 +1,6 @@
+[submodule "upstream/ClassicUO"]
+	path = upstream/ClassicUO
+	url = https://github.com/ClassicUO/ClassicUO.git
+[submodule "upstream/ClassicAssist"]
+	path = upstream/ClassicAssist
+	url = https://github.com/Reetus/ClassicAssist.Avalonia.git

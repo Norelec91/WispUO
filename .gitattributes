@@ -1,0 +1,10 @@
+# Patches and overlays are applied byte for byte: no line ending conversion.
+*.patch -text
+classicuo/overlay/** -text
+classicassist/overlay/** -text
+classicuo/remove.txt -text
+classicuo/fna.commit -text
+classicassist/remove.txt -text
+
+# The scripts run under bash everywhere, Git Bash included.
+*.sh text eol=lf
