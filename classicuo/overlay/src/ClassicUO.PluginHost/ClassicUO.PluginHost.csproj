@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The plugin host: a .NET 10 library the NativeAOT client loads through hostfxr,
+    so that managed CUO_API plugins (Razor Enhanced and the like) run on a JIT
+    runtime next to it, the same on Windows, macOS and Linux.
+  -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <AssemblyName>ClassicUO.PluginHost</AssemblyName>
+    <RootNamespace>ClassicUO</RootNamespace>
+
+    <!-- hostfxr needs a runtimeconfig.json next to the assembly it loads -->
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+    <!-- plugins are older code: let them roll forward onto whatever runtime is there -->
+    <RollForward>LatestMajor</RollForward>
+
+    <!-- the client settings (InvariantGlobalization, resource keys) are not ours to impose on plugins -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <UseSystemResourceKeys>false</UseSystemResourceKeys>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="cuoapi">
+      <HintPath>..\..\external\cuoapi\cuoapi.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

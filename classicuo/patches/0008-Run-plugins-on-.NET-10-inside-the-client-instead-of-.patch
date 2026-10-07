@@ -1,0 +1,166 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Alessandro Lopez <norelec@gmail.com>
+Date: Tue, 6 Oct 2026 08:58:39 +0200
+Subject: [PATCH] Run plugins on .NET 10 inside the client instead of Mono
+
+The client is a NativeAOT executable, so CUO_API plugins such as Razor
+Enhanced, built for .NET Framework, need a runtime to run on. Upstream used a
+.NET Framework bootstrap on Windows and Mono (monokickstart) elsewhere; both go.
+
+When settings.json lists plugins, CoreClrPluginHost.cs finds hostfxr and starts
+the .NET 10 runtime in the client's process, then loads ClassicUO.PluginHost.dll
+(from the old Bootstrap sources). It fills the HostBindings table the bootstrap
+used to hand over, so the client side is unchanged from upstream. Plugins go
+into the host's load context, the entry assembly is set to the host, and their
+dependencies are found next to each plugin. Without plugins nothing starts.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
+---
+ .github/workflows/deploy.yml                 |  4 --
+ ClassicUO.sln                                | 40 --------------------
+ src/ClassicUO.Client/ClassicUO.Client.csproj |  7 ----
+ src/ClassicUO.Client/Main.cs                 |  7 ++++
+ 4 files changed, 7 insertions(+), 51 deletions(-)
+
+diff --git a/.github/workflows/deploy.yml b/.github/workflows/deploy.yml
+index ff88d50de..ecfbe4487 100644
+--- a/.github/workflows/deploy.yml
++++ b/.github/workflows/deploy.yml
+@@ -12,7 +12,6 @@ env:
+   CUO_ASSEMBLY_VERSION: "1.1.0.${{ github.run_number }}"
+   CUO_OUTPUT_PATH: "dist"
+   CUO_PROJECT_PATH: "src/ClassicUO.Client/ClassicUO.Client.csproj"
+-  BOOT_PROJECT_PATH: "src/ClassicUO.Bootstrap/src/ClassicUO.Bootstrap.csproj"
+   TARGET_FRAMEWORK: net10.0
+ 
+   DOTNET_NOLOGO: false
+@@ -57,9 +56,6 @@ jobs:
+           dotnet-version: 10.0.x
+           include-prerelease: false
+ 
+-      - name: Build Bootstrap app
+-        run: dotnet publish "${{ env.BOOT_PROJECT_PATH }}" -c Release -o "${{ env.CUO_OUTPUT_PATH }}" /p:AssemblyVersion=${{ env.CUO_ASSEMBLY_VERSION }} /p:FileVersion=${{ env.CUO_ASSEMBLY_VERSION }} /p:OutputType=WinExe
+-
+       - name: Build ClassicUO
+         run: dotnet publish "${{ env.CUO_PROJECT_PATH }}" -c Release -r "${{ matrix.target }}" -o "${{ env.CUO_OUTPUT_PATH }}" /p:IS_DEV_BUILD=true /p:AssemblyVersion=${{ env.CUO_ASSEMBLY_VERSION }} /p:FileVersion=${{ env.CUO_ASSEMBLY_VERSION }} /p:NativeLib=Shared /p:OutputType=Library
+ 
+diff --git a/ClassicUO.sln b/ClassicUO.sln
+index 03bc3df6f..68f87163f 100644
+--- a/ClassicUO.sln
++++ b/ClassicUO.sln
+@@ -15,34 +15,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{D5E764E7
+ EndProject
+ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ManifestCreator", "tools\ManifestCreator\ManifestCreator.csproj", "{6F193271-70B3-48EC-9CE5-B8EE1A5CA89E}"
+ EndProject
+-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "monokickstart", "monokickstart", "{D7DD340F-1EE2-4F8A-AA3E-A8FC76098AD6}"
+-	ProjectSection(SolutionItems) = preProject
+-		tools\monokickstart\Accessibility.dll = tools\monokickstart\Accessibility.dll
+-		tools\monokickstart\ClassicUO = tools\monokickstart\ClassicUO
+-		tools\monokickstart\ClassicUO.bin.osx = tools\monokickstart\ClassicUO.bin.osx
+-		tools\monokickstart\ClassicUO.bin.x86_64 = tools\monokickstart\ClassicUO.bin.x86_64
+-		tools\monokickstart\Microsoft.CSharp.dll = tools\monokickstart\Microsoft.CSharp.dll
+-		tools\monokickstart\Mono.Posix.dll = tools\monokickstart\Mono.Posix.dll
+-		tools\monokickstart\Mono.Security.dll = tools\monokickstart\Mono.Security.dll
+-		tools\monokickstart\monoconfig = tools\monokickstart\monoconfig
+-		tools\monokickstart\monomachineconfig = tools\monokickstart\monomachineconfig
+-		tools\monokickstart\mscorlib.dll = tools\monokickstart\mscorlib.dll
+-		tools\monokickstart\Newtonsoft.Json.dll = tools\monokickstart\Newtonsoft.Json.dll
+-		tools\monokickstart\System.Configuration.dll = tools\monokickstart\System.Configuration.dll
+-		tools\monokickstart\System.Core.dll = tools\monokickstart\System.Core.dll
+-		tools\monokickstart\System.Data.dll = tools\monokickstart\System.Data.dll
+-		tools\monokickstart\System.dll = tools\monokickstart\System.dll
+-		tools\monokickstart\System.Drawing.dll = tools\monokickstart\System.Drawing.dll
+-		tools\monokickstart\System.IO.Compression.dll = tools\monokickstart\System.IO.Compression.dll
+-		tools\monokickstart\System.IO.Compression.FileSystem.dll = tools\monokickstart\System.IO.Compression.FileSystem.dll
+-		tools\monokickstart\System.Numerics.dll = tools\monokickstart\System.Numerics.dll
+-		tools\monokickstart\System.Runtime.Serialization.dll = tools\monokickstart\System.Runtime.Serialization.dll
+-		tools\monokickstart\System.Security.dll = tools\monokickstart\System.Security.dll
+-		tools\monokickstart\System.Windows.Forms.dll = tools\monokickstart\System.Windows.Forms.dll
+-		tools\monokickstart\System.Xml.dll = tools\monokickstart\System.Xml.dll
+-		tools\monokickstart\System.Xml.Linq.dll = tools\monokickstart\System.Xml.Linq.dll
+-	EndProjectSection
+-EndProject
+ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "settings", "settings", "{21AF20E5-1A3A-414D-9B1F-AB8F3800E567}"
+ 	ProjectSection(SolutionItems) = preProject
+ 		.editorconfig = .editorconfig
+@@ -71,8 +43,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ClassicUO.Utility", "src\Cl
+ EndProject
+ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FNA.Core", "external\FNA\FNA.Core.csproj", "{A6DCFCE5-192B-4AE1-B228-206D37A0021C}"
+ EndProject
+-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ClassicUO.Bootstrap", "src\ClassicUO.Bootstrap\src\ClassicUO.Bootstrap.csproj", "{8974A04C-8360-4225-ABDD-0C56555F676D}"
+-EndProject
+ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FileEmbed", "external\FileEmbed\FileEmbed\FileEmbed.csproj", "{027B5178-C306-4900-996D-97E8E43567B6}"
+ EndProject
+ Global
+@@ -155,14 +125,6 @@ Global
+ 		{A6DCFCE5-192B-4AE1-B228-206D37A0021C}.Release|Any CPU.Build.0 = Release|Any CPU
+ 		{A6DCFCE5-192B-4AE1-B228-206D37A0021C}.Release|x64.ActiveCfg = Release|Any CPU
+ 		{A6DCFCE5-192B-4AE1-B228-206D37A0021C}.Release|x64.Build.0 = Release|Any CPU
+-		{8974A04C-8360-4225-ABDD-0C56555F676D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{8974A04C-8360-4225-ABDD-0C56555F676D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{8974A04C-8360-4225-ABDD-0C56555F676D}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{8974A04C-8360-4225-ABDD-0C56555F676D}.Debug|x64.Build.0 = Debug|Any CPU
+-		{8974A04C-8360-4225-ABDD-0C56555F676D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{8974A04C-8360-4225-ABDD-0C56555F676D}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{8974A04C-8360-4225-ABDD-0C56555F676D}.Release|x64.ActiveCfg = Release|Any CPU
+-		{8974A04C-8360-4225-ABDD-0C56555F676D}.Release|x64.Build.0 = Release|Any CPU
+ 		{027B5178-C306-4900-996D-97E8E43567B6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+ 		{027B5178-C306-4900-996D-97E8E43567B6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+ 		{027B5178-C306-4900-996D-97E8E43567B6}.Debug|x64.ActiveCfg = Debug|Any CPU
+@@ -177,7 +139,6 @@ Global
+ 	EndGlobalSection
+ 	GlobalSection(NestedProjects) = preSolution
+ 		{6F193271-70B3-48EC-9CE5-B8EE1A5CA89E} = {D5E764E7-2719-4937-AC10-0D2D789A1134}
+-		{D7DD340F-1EE2-4F8A-AA3E-A8FC76098AD6} = {D5E764E7-2719-4937-AC10-0D2D789A1134}
+ 		{85972CEA-4AB1-45DC-922C-00C4E17764B5} = {B766E918-7350-473A-B28D-63C344385924}
+ 		{5AF00B6D-70C2-4CB0-A5D8-41F488F0DDF2} = {FA5D7AB8-3570-4E55-95B0-35BA6842FEE3}
+ 		{4B2C7249-9728-451B-8C9C-F73A164703B6} = {8EAF9583-DC5B-46DC-A01E-47B00A1C862E}
+@@ -186,7 +147,6 @@ Global
+ 		{CE54D5D2-068A-4456-9720-2AF0688D9E7F} = {8EAF9583-DC5B-46DC-A01E-47B00A1C862E}
+ 		{9B748316-24DC-40AA-A39D-476EF83DF96C} = {8EAF9583-DC5B-46DC-A01E-47B00A1C862E}
+ 		{A6DCFCE5-192B-4AE1-B228-206D37A0021C} = {FA5D7AB8-3570-4E55-95B0-35BA6842FEE3}
+-		{8974A04C-8360-4225-ABDD-0C56555F676D} = {8EAF9583-DC5B-46DC-A01E-47B00A1C862E}
+ 		{027B5178-C306-4900-996D-97E8E43567B6} = {FA5D7AB8-3570-4E55-95B0-35BA6842FEE3}
+ 	EndGlobalSection
+ 	GlobalSection(ExtensibilityGlobals) = postSolution
+diff --git a/src/ClassicUO.Client/ClassicUO.Client.csproj b/src/ClassicUO.Client/ClassicUO.Client.csproj
+index e2739f23b..dbe54edee 100644
+--- a/src/ClassicUO.Client/ClassicUO.Client.csproj
++++ b/src/ClassicUO.Client/ClassicUO.Client.csproj
+@@ -128,17 +128,10 @@
+   </Target>
+ 
+   <Target Name="CopyExternalDeps_publish" AfterTargets="Publish">
+-    <ItemGroup>
+-      <MonockickstartPath Include="$(ProjectDir)..\..\tools\monokickstart\*.*" />
+-    </ItemGroup>
+-
+     <Copy SourceFiles="@(DataFiles_win)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="'$(_IsWindows)' == 'true'" />
+     <Copy SourceFiles="@(DataFiles_linux)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="'$(_IsLinux)' == 'true'" />
+     <Copy SourceFiles="@(DataFiles_osx)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" Condition="'$(_IsMacOS)' == 'true'" />
+     <Copy SourceFiles="@(DataFiles_d3d12)" DestinationFolder="$(PublishDir)\D3D12\" SkipUnchangedFiles="true" Condition="'$(_IsWindows)' == 'true'" />
+-
+-    <Copy SourceFiles="@(MonockickstartPath)" DestinationFolder="$(PublishDir)\" SkipUnchangedFiles="true" Condition="'$(_IsLinux)' == 'true' Or '$(_IsMacOS)' == 'true'" />
+-
+   </Target>
+ 
+ </Project>
+diff --git a/src/ClassicUO.Client/Main.cs b/src/ClassicUO.Client/Main.cs
+index a58fed896..bb32310a3 100644
+--- a/src/ClassicUO.Client/Main.cs
++++ b/src/ClassicUO.Client/Main.cs
+@@ -220,6 +220,13 @@ namespace ClassicUO
+                         break;
+                 }
+ 
++                // Standalone, nobody handed us a plugin host: start the .NET runtime
++                // ourselves, but only when there is a plugin to run in it.
++                if (pluginHost == null && Settings.GlobalSettings.Plugins.Length > 0)
++                {
++                    pluginHost = CoreClrPluginHost.Create();
++                }
++
+                 Client.Run(pluginHost);
+             }
+ 
