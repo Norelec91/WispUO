@@ -1,0 +1,132 @@
+# Builds and tests WispUO on each platform and, for a tag, publishes the packages
+# as a release:
+#
+#   git tag v1.1.0 && git push origin v1.1.0              a release
+#   git tag v1.1.0-beta.1 && git push origin v1.1.0-beta.1  a pre-release
+#
+# Started by hand instead (Actions > Release > Run workflow), it builds and tests
+# without publishing anything: the packages stay on the run's page as artifacts,
+# for trying a change before releasing it.
+#
+# NativeAOT does not cross-compile across operating systems, so every package is
+# built on its own runner. A tag is the version in src/WispUO.cs, with a suffix
+# after "-" for a pre-release; a pre-release is never shown as the latest one, so
+# Homebrew and anyone following releases skip it.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            packages: windows
+          - os: ubuntu-24.04
+            packages: linux-x64
+          - os: ubuntu-24.04-arm
+            packages: linux-arm64
+          - os: macos-latest
+            packages: macos
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Version
+        id: version
+        shell: bash
+        run: |
+          version="$(sed -n 's/.*Version = "\(.*\)".*/\1/p' classicuo/overlay/src/WispUO.cs)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            tag="${GITHUB_REF_NAME#v}"
+            if [[ "${tag%%-*}" != "$version" ]]; then
+              echo "tag $GITHUB_REF_NAME, but src/WispUO.cs says $version" >&2
+              exit 1
+            fi
+          fi
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Linux tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang zlib1g-dev flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+
+      - name: Build
+        shell: bash
+        run: bash scripts/build.sh
+
+      # on every runner: no package of a build whose tests fail
+      - name: Test
+        shell: bash
+        run: bash scripts/test.sh
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p packages
+          case "$RUNNER_OS" in
+            Windows)
+              (cd bin/dist && 7z a -tzip ../../packages/WispUO-windows-x64.zip .)
+              ;;
+            Linux)
+              arch=x64
+              [[ "$(uname -m)" == aarch64 ]] && arch=arm64
+              cp bin/WispUO.flatpak "packages/WispUO-linux-$arch.flatpak"
+              # the plain build too, for systems without Flatpak: a WispUO folder
+              tar -czf "packages/WispUO-linux-$arch.tar.gz" -C bin --transform 's,^dist,WispUO,' dist
+              ;;
+            macOS)
+              bash work/ClassicUO/scripts/make-macos-app.sh --sign \
+                --dist "$PWD/bin/dist" --out "$PWD/bin/WispUO.app" --version "${{ steps.version.outputs.version }}"
+              ditto -c -k --keepParent bin/WispUO.app packages/WispUO-macos-universal.zip
+              ;;
+          esac
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.packages }}
+          path: packages/
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: WispUO ${{ github.ref_name }}
+          # what changed since the previous release, from the commits
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            WispUO-windows-x64.zip
+            WispUO-linux-x64.flatpak
+            WispUO-linux-x64.tar.gz
+            WispUO-linux-arm64.flatpak
+            WispUO-linux-arm64.tar.gz
+            WispUO-macos-universal.zip
