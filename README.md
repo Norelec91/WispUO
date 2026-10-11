@@ -70,8 +70,10 @@ exporting the distribution again changes nothing in `classicuo/` and
 
 ## Licenses
 
-ClassicUO is under the BSD 2-Clause license, ClassicAssist under the GNU GPL
-version 3; the patches and overlays follow the license of the component they
-change. A build of WispUO carries ClassicAssist, so whoever distributes it
-must make its source available: this repository, with its submodules, is that
-source.
+WispUO's own work is under the BSD 2-Clause license (`LICENSE`), as ClassicUO
+is: the scripts, the workflow and `classicuo/`. `classicassist/` changes
+ClassicAssist and is under the GNU GPL version 3 or later, as ClassicAssist is
+(`classicassist/LICENSE.txt`).
+
+A build carries ClassicAssist, so whoever distributes it must make its source
+available: this repository, with its submodules, is that source.

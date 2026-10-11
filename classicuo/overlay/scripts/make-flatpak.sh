@@ -139,7 +139,7 @@ cat > "$stage/$app_id.metainfo.xml" <<METAINFO
   <name>WispUO</name>
   <summary>Ultima Online shards with ClassicUO</summary>
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>BSD-2-Clause</project_license>
+  <project_license>BSD-2-Clause AND GPL-3.0-or-later</project_license>
   <description>
     <p>A distribution of ClassicUO, the open source Ultima Online client, with
     a launcher holding the list of shards and, optionally,
