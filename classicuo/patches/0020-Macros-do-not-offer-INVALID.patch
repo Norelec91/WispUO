@@ -1,6 +1,6 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Alessandro Lopez <norelec@gmail.com>
-Date: Tue, 6 Oct 2026 09:04:30 +0200
+Date: Tue, 6 Oct 2026 09:04:25 +0200
 Subject: [PATCH] Macros: do not offer INVALID
 
 It only keeps the numbers of the macros after it. The editor maps list positions
@@ -10,22 +10,25 @@ meaning.
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01LFcBNQtF3Z7vfzi99BXwUe
 ---
- src/ClassicUO.Client/Game/UI/Controls/MacroControl.cs | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ src/ClassicUO.Client/Game/UI/Controls/MacroControl.cs | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
 diff --git a/src/ClassicUO.Client/Game/UI/Controls/MacroControl.cs b/src/ClassicUO.Client/Game/UI/Controls/MacroControl.cs
-index 489a2408c..959c4d8df 100644
+index ef4c2df62..77eb7475a 100644
 --- a/src/ClassicUO.Client/Game/UI/Controls/MacroControl.cs
 +++ b/src/ClassicUO.Client/Game/UI/Controls/MacroControl.cs
-@@ -15,7 +15,6 @@ namespace ClassicUO.Game.UI.Controls
+@@ -13,9 +13,8 @@ using ClassicUO.Renderer.Gumps;
+ 
+ namespace ClassicUO.Game.UI.Controls
  {
-     internal partial class MacroControl : Control
+-    internal class MacroControl : Control
++    internal partial class MacroControl : Control
      {
 -        private static readonly string[] _allHotkeysNames = Enum.GetNames(typeof(MacroType));
          private static readonly string[] _allSubHotkeysNames = Enum.GetNames(typeof(MacroSubType));
          private readonly DataBox _databox;
          private readonly HotkeyBox _hotkeyBox;
-@@ -378,7 +377,7 @@ namespace ClassicUO.Game.UI.Controls
+@@ -374,7 +373,7 @@ namespace ClassicUO.Game.UI.Controls
                      0,
                      200,
                      _items,
@@ -34,7 +37,7 @@ index 489a2408c..959c4d8df 100644
                  )
                  {
                      Tag = obj
-@@ -510,7 +509,7 @@ namespace ClassicUO.Game.UI.Controls
+@@ -506,7 +505,7 @@ namespace ClassicUO.Game.UI.Controls
                  }
                  else
                  {

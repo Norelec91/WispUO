@@ -6,7 +6,6 @@
 using System;
 using System.Linq;
 using ClassicUO.Game.Managers;
-using ClassicUO.Resources;
 
 namespace ClassicUO.Game.UI.Controls
 {
@@ -19,39 +18,5 @@ namespace ClassicUO.Game.UI.Controls
         private static readonly MacroType[] _hidden = { MacroType.INVALID, MacroType.RazorMacro };
         private static readonly MacroType[] _allHotkeys = Enum.GetValues<MacroType>().Where(t => Array.IndexOf(_hidden, t) < 0).ToArray();
         private static readonly string[] _allHotkeysNames = _allHotkeys.Select(t => t.ToString()).ToArray();
-
-        // the Loop checkbox (Game/Managers/MacroManager.Loop.cs)
-        private Checkbox _loopBox;
-
-        private void AddLoopBox()
-        {
-            _loopBox = new Checkbox
-            (
-                0x00D2,
-                0x00D3,
-                ResDistro.MacroLoop,
-                0xFF,
-                0xFFFF
-            )
-            {
-                X = 0,
-                Y = _hotkeyBox.Height + 57
-            };
-
-            _loopBox.ValueChanged += (sender, e) =>
-            {
-                if (Macro != null)
-                {
-                    Macro.Loop = _loopBox.IsChecked;
-
-                    if (!Macro.Loop)
-                    {
-                        _gump.World.Macros.StopLoop(Macro);
-                    }
-                }
-            };
-
-            Add(_loopBox);
-        }
     }
 }
